@@ -36,7 +36,7 @@ import '../features/announcements/screens/announcements_screen.dart';
 import '../features/announcements/screens/announcement_create_screen.dart';
 import '../features/resources/screens/resources_screen.dart';
 import '../shared/widgets/main_scaffold.dart';
-import '../shared/widgets/placeholder_screen.dart';
+import '../features/activity_log/screens/activity_log_screen.dart';
 
 class _AuthRefreshNotifier extends ChangeNotifier {
   AuthChangeEvent? lastEvent;
@@ -182,7 +182,7 @@ const _onboardingRoutes = {
 };
 
 // President-only routes — non-presidents are bounced to /dashboard
-const _presidentRoutes = {'/approvals'};
+const _presidentRoutes = {'/approvals', '/activity-log'};
 
 final appRouter = GoRouter(
   initialLocation: '/login',
@@ -398,7 +398,7 @@ final appRouter = GoRouter(
           name: 'activity-log',
           pageBuilder: (_, s) => _TabPage(
             key: s.pageKey,
-            child: const PlaceholderScreen(title: 'Activity Log'),
+            child: const ActivityLogScreen(),
           ),
         ),
         GoRoute(
