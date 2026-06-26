@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
+# SQLite database
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+/build/
+
+# Firebase credentials (never commit these)
+google-services.json
+GoogleService-Info.plist
+
+# Claude Code local settings (contains personal tokens/secrets)
+.claude/settings.local.json
+
+# Supabase CLI cache (local project-ref / linked-project metadata)
+supabase/.temp/

@@ -1,0 +1,66 @@
+name: club_os
+description: ClubOS — University club management app.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Backend
+  supabase_flutter: ^2.8.0
+
+  # State management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Navigation
+  go_router: ^14.6.2
+
+  # Firebase
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+
+  # Environment variables
+  flutter_dotenv: ^5.2.1
+
+  # Utilities
+  intl: ^0.19.0
+  uuid: ^4.5.1
+  cached_network_image: ^3.4.1
+  file_picker: ^8.1.2
+  timeago: ^3.7.0
+  url_launcher: ^6.3.1
+  table_calendar: ^3.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.13
+  riverpod_generator: ^2.6.1
+  custom_lint: ^0.7.0
+  riverpod_lint: ^2.6.1
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  ios: true
+  android: true
+  image_path: "assets/images/logo.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/logo.png"
+  web:
+    generate: false
+  windows:
+    generate: false
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/
