@@ -111,12 +111,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           ),
         ),
         floatingActionButton: canAssign
-            ? FloatingActionButton(
+            ? FloatingActionButton.extended(
                 onPressed: () => context.go('/tasks/create'),
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 2,
-                child: const Icon(Icons.add_rounded, size: 28),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Assign'),
               )
             : null,
       ),

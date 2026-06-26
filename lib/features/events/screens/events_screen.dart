@@ -180,12 +180,13 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
           ),
         ),
         floatingActionButton: canPost
-            ? FloatingActionButton(
+            ? FloatingActionButton.extended(
                 onPressed: () => context.go('/events/create'),
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 2,
-                child: const Icon(Icons.add_rounded, size: 28),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Create'),
               )
             : null,
       ),

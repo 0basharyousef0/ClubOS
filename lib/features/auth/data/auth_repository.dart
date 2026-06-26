@@ -126,6 +126,13 @@ class AuthRepository {
         .toList();
   }
 
+  Future<void> deleteClub(String clubId) async {
+    await supabase
+        .from(AppConstants.tableClubs)
+        .delete()
+        .eq('id', clubId);
+  }
+
   Future<void> approveRole(String roleId) async {
     final user = supabase.auth.currentUser!;
     await supabase

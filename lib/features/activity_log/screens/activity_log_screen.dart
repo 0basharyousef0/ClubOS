@@ -28,6 +28,13 @@ class ActivityLogScreen extends ConsumerWidget {
           children: [
             GradientHeader(
               title: 'Activity Log',
+              badge: activityAsync.whenOrNull(
+                data: (items) => GradientHeaderBadge(
+                  icon: Icons.history_rounded,
+                  label: '${items.length} '
+                      '${items.length == 1 ? 'entry' : 'entries'}',
+                ),
+              ),
               trailing: filter.isActive
                   ? TextButton(
                       onPressed: () => ref

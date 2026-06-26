@@ -77,12 +77,10 @@ class AnnouncementsScreen extends ConsumerWidget {
             ? FloatingActionButton.extended(
                 onPressed: () => context.push('/announcements/create'),
                 backgroundColor: AppColors.primary,
-                icon: const Icon(Icons.add_rounded, color: Colors.white),
-                label: const Text(
-                  'Post',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600),
-                ),
+                foregroundColor: Colors.white,
+                elevation: 2,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Post'),
               )
             : null,
       ),

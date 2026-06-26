@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/theme.dart';
@@ -8,7 +9,6 @@ import '../../../core/supabase_client.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../../../shared/widgets/gradient_header.dart';
 import '../../../shared/widgets/logout_sheet.dart';
-import 'package:go_router/go_router.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -19,6 +19,12 @@ class SettingsScreen extends ConsumerWidget {
     final user = supabase.auth.currentUser;
     final name = user?.userMetadata?['full_name'] as String? ?? '';
     final email = user?.email ?? '';
+    final activeRole = ref.watch(activeClubRoleProvider);
+    final isPresident = activeRole?.isPresident ?? false;
+    final clubName = activeRole?.club?.name ?? '';
+    final allRoles = ref.watch(userClubRolesProvider).valueOrNull ?? [];
+    final hasMultipleClubs =
+        allRoles.where((r) => r.isApproved).length > 1;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -133,6 +139,18 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
 
+            if (hasMultipleClubs) ...[
+              const SizedBox(height: 24),
+              const _SectionLabel(label: 'Club'),
+              const SizedBox(height: 8),
+              _SettingsTile(
+                icon: Icons.swap_horiz_rounded,
+                title: 'Switch Club',
+                subtitle: clubName.isNotEmpty ? clubName : 'Active club',
+                onTap: () => context.go('/club-switcher'),
+              ),
+            ],
+
             const SizedBox(height: 24),
             const _SectionLabel(label: 'Session'),
             const SizedBox(height: 8),
@@ -152,6 +170,20 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
 
+            if (isPresident) ...[
+              const SizedBox(height: 24),
+              const _SectionLabel(label: 'Danger Zone'),
+              const SizedBox(height: 8),
+              _SettingsTile(
+                icon: Icons.delete_forever_rounded,
+                title: 'Delete Club',
+                subtitle: 'Permanently delete $clubName and all its data',
+                iconColor: AppColors.error,
+                titleColor: AppColors.error,
+                onTap: () => _showDeleteClubSheet(context, ref, clubName),
+              ),
+            ],
+
                 const SizedBox(height: 32),
               ],
             ),
@@ -159,6 +191,44 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     ));
+  }
+
+  void _showDeleteClubSheet(
+    BuildContext context,
+    WidgetRef ref,
+    String clubName,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DeleteClubSheet(
+        clubName: clubName,
+        onConfirm: () async {
+          final role = ref.read(activeClubRoleProvider);
+          if (role == null) return;
+
+          final allRoles = ref.read(userClubRolesProvider).valueOrNull ?? [];
+          await ref.read(authRepositoryProvider).deleteClub(role.clubId);
+
+          ref.read(selectedClubRoleProvider.notifier).state = null;
+          ref.invalidate(userClubRolesProvider);
+
+          final otherApproved = allRoles
+              .where((r) => r.isApproved && r.clubId != role.clubId)
+              .toList();
+
+          if (context.mounted) {
+            if (otherApproved.isNotEmpty) {
+              context.go('/club-switcher');
+            } else {
+              await ref.read(authRepositoryProvider).signOut();
+              if (context.mounted) context.go('/login');
+            }
+          }
+        },
+      ),
+    );
   }
 
   void _showChangeSheet(
@@ -629,6 +699,367 @@ class _ChangeSheetState extends State<_ChangeSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Delete club sheet ─────────────────────────────────────────
+
+class _DeleteClubSheet extends StatefulWidget {
+  final String clubName;
+  final Future<void> Function() onConfirm;
+
+  const _DeleteClubSheet({
+    required this.clubName,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_DeleteClubSheet> createState() => _DeleteClubSheetState();
+}
+
+class _DeleteClubSheetState extends State<_DeleteClubSheet> {
+  int _step = 0; // 0 = warning, 1 = confirm
+  final _nameController = TextEditingController();
+  bool _understood = false;
+  bool _isDeleting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  bool get _nameMatches =>
+      _nameController.text.trim() == widget.clubName.trim();
+
+  bool get _canDelete => _nameMatches && _understood && !_isDeleting;
+
+  Future<void> _delete() async {
+    setState(() {
+      _isDeleting = true;
+      _error = null;
+    });
+    try {
+      Navigator.pop(context);
+      await widget.onConfirm();
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+          _error = 'Could not delete club. Please try again.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
+        MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPadding + 24),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        child: _step == 0 ? _buildWarningStep() : _buildConfirmStep(),
+      ),
+    );
+  }
+
+  Widget _buildWarningStep() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        const SizedBox(height: 28),
+        Center(
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.delete_forever_rounded,
+              color: AppColors.error,
+              size: 30,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Delete Club?',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'This will permanently delete "${widget.clubName}" and cannot be undone. The following will be removed:',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _ConsequenceRow(icon: Icons.people_alt_outlined, label: 'All members and roles'),
+        const SizedBox(height: 8),
+        _ConsequenceRow(icon: Icons.checklist_rounded, label: 'All tasks and comments'),
+        const SizedBox(height: 8),
+        _ConsequenceRow(icon: Icons.event_outlined, label: 'All events and RSVPs'),
+        const SizedBox(height: 8),
+        _ConsequenceRow(icon: Icons.campaign_outlined, label: 'All announcements'),
+        const SizedBox(height: 8),
+        _ConsequenceRow(icon: Icons.how_to_vote_outlined, label: 'All polls and votes'),
+        const SizedBox(height: 28),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: () => setState(() => _step = 1),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Continue',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfirmStep() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          'Confirm deletion',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+            children: [
+              const TextSpan(text: 'Type '),
+              TextSpan(
+                text: widget.clubName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const TextSpan(text: ' to confirm.'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _nameController,
+          autofocus: true,
+          autocorrect: false,
+          decoration: InputDecoration(
+            hintText: widget.clubName,
+            errorText: _nameController.text.isNotEmpty && !_nameMatches
+                ? 'Name does not match'
+                : null,
+          ),
+          onChanged: (_) => setState(() => _error = null),
+        ),
+        const SizedBox(height: 20),
+        GestureDetector(
+          onTap: () => setState(() => _understood = !_understood),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: _understood,
+                  onChanged: (v) => setState(() => _understood = v ?? false),
+                  activeColor: AppColors.error,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'I understand this action is permanent and cannot be undone.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline,
+                    color: AppColors.error, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(
+                        color: AppColors.error, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _canDelete ? _delete : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: AppColors.error.withValues(alpha: 0.35),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: _isDeleting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Permanently Delete Club',
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed: () => setState(() => _step = 0),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Back',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ConsequenceRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _ConsequenceRow({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppColors.error),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }

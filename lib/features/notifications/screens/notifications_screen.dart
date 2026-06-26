@@ -26,6 +26,14 @@ class NotificationsScreen extends ConsumerWidget {
           children: [
             GradientHeader(
               title: 'Notifications',
+              badge: notifsAsync.whenOrNull(
+                data: (items) => GradientHeaderBadge(
+                  icon: Icons.notifications_rounded,
+                  label: unread > 0
+                      ? '$unread unread'
+                      : '${items.length} total',
+                ),
+              ),
               trailing: unread > 0
                   ? TextButton(
                       onPressed: () => _markAll(ref),

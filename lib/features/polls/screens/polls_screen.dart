@@ -18,6 +18,7 @@ class PollsScreen extends ConsumerWidget {
     final role = ref.watch(activeClubRoleProvider);
     final canCreate =
         role?.isPresident == true || role?.isVicePresident == true;
+    final pollsAsync = ref.watch(pollsProvider);
 
     return DefaultTabController(
       length: 2,
@@ -26,15 +27,26 @@ class PollsScreen extends ConsumerWidget {
         child: Scaffold(
           backgroundColor: AppColors.background,
           floatingActionButton: canCreate
-              ? FloatingActionButton(
+              ? FloatingActionButton.extended(
                   onPressed: () => context.go('/polls/create'),
                   backgroundColor: AppColors.primary,
-                  child: const Icon(Icons.add, color: Colors.white),
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Initiate'),
                 )
               : null,
           body: Column(
             children: [
-              const GradientHeader(title: 'Polls'),
+              GradientHeader(
+                title: 'Polls',
+                badge: pollsAsync.whenOrNull(
+                  data: (polls) => GradientHeaderBadge(
+                    icon: Icons.how_to_vote_rounded,
+                    label: '${polls.length} poll${polls.length == 1 ? '' : 's'}',
+                  ),
+                ),
+              ),
               Material(
                 color: AppColors.background,
                 child: const TabBar(

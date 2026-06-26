@@ -89,6 +89,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         children: [
           GradientHeader(
             title: 'Resources',
+            badge: const GradientHeaderBadge(
+              icon: Icons.menu_book_rounded,
+              label: 'Club Constitution',
+            ),
             trailing: _editing
                 ? Row(
                     mainAxisSize: MainAxisSize.min,
