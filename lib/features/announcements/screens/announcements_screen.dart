@@ -39,7 +39,7 @@ class AnnouncementsScreen extends ConsumerWidget {
               const SizedBox(height: 20),
               ...announcementsAsync.when(
                 loading: () => [const _LoadingState()],
-                error: (_, __) => [
+                error: (_, _) => [
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
                     child: _EmptyState(

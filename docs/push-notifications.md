@@ -1,5 +1,14 @@
 # Push Notifications — Setup Guide
 
+> **Status (2026-07-02):** everything below is done EXCEPT the Firebase
+> config files. Migrations are applied, the edge function is deployed with
+> `WEBHOOK_SECRET` + `FIREBASE_SERVICE_ACCOUNT` set, the database webhook is
+> live, and the Flutter app auto-registers/removes device tokens. The only
+> remaining work is **Step 2** (add `google-services.json` +
+> `GoogleService-Info.plist`) and **Step 7** (iOS APNs key + Xcode
+> capabilities). Until then the app runs safely with in-app notifications
+> only — `FcmService` no-ops when Firebase isn't configured.
+
 The in-app notification center (the bell + the `/notifications` screen) already
 works on its own: DB triggers insert rows into `public.notifications`, and the
 app reads them. **This guide adds the last piece — delivering those as actual
@@ -66,12 +75,20 @@ flutterfire configure          # writes lib/firebase_options.dart
 
 ---
 
-## Step 3 — Turn on push in the Flutter app
+## Step 3 — Turn on push in the Flutter app (already done)
 
-`FcmService` (in `lib/core/fcm_service.dart`) is already written with
-`init()`, `registerToken()` and `removeToken()`. You just need to call them.
-Apply these edits **after** Step 2 (before that, `Firebase.initializeApp()`
-would crash on launch):
+This is fully wired in code — no edits needed:
+
+- `main.dart` initializes Firebase inside a try/catch and sets
+  `FcmService.firebaseReady`; if the config files are missing, push is
+  silently disabled and the app runs normally.
+- The device token is registered on session restore and on every sign-in
+  (via an `onAuthStateChange` listener), and removed in
+  `AuthRepository.signOut()`.
+- `android/app/build.gradle.kts` applies the `google-services` plugin only
+  when `google-services.json` exists, so the build never breaks.
+
+The original manual instructions are kept below for reference:
 
 **`lib/main.dart`**
 

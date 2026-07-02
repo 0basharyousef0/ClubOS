@@ -5,9 +5,15 @@ import 'constants.dart';
 import 'supabase_client.dart';
 
 class FcmService {
-  static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  /// Set by main.dart once Firebase.initializeApp() succeeds. While false
+  /// (no google-services config files yet), every method is a safe no-op so
+  /// the app runs with in-app notifications only.
+  static bool firebaseReady = false;
+
+  static FirebaseMessaging get _messaging => FirebaseMessaging.instance;
 
   static Future<void> init() async {
+    if (!firebaseReady) return;
     await _requestPermission();
     _setupForegroundHandler();
   }
@@ -24,36 +30,47 @@ class FcmService {
   }
 
   static Future<String?> getToken() async {
+    if (!firebaseReady) return null;
     return await _messaging.getToken();
   }
 
   /// Upserts this device's FCM token for the signed-in user.
-  ///
-  /// Dormant until Firebase is initialized (see main.dart) and a
-  /// google-services config is added — call this right after a successful
-  /// login once push is enabled. Safe to call repeatedly.
+  /// Called from main.dart on session restore and on every sign-in.
+  /// Safe to call repeatedly.
   static Future<void> registerToken() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-    final token = await _messaging.getToken();
-    if (token == null) return;
-    await supabase.from(AppConstants.tableFcmTokens).upsert({
-      'user_id': user.id,
-      'token': token,
-      'platform': defaultTargetPlatform.name,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'token');
+    if (!firebaseReady) return;
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+      final token = await _messaging.getToken();
+      if (token == null) return;
+      await supabase.from(AppConstants.tableFcmTokens).upsert({
+        'user_id': user.id,
+        'token': token,
+        'platform': defaultTargetPlatform.name,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'token');
+    } catch (e) {
+      // Token registration must never break auth flows.
+      if (kDebugMode) debugPrint('FCM registerToken failed: $e');
+    }
   }
 
-  /// Removes this device's token (call on sign-out so the user stops
+  /// Removes this device's token (called on sign-out so the user stops
   /// receiving push on a device they've left).
   static Future<void> removeToken() async {
-    final token = await _messaging.getToken();
-    if (token == null) return;
-    await supabase
-        .from(AppConstants.tableFcmTokens)
-        .delete()
-        .eq('token', token);
+    if (!firebaseReady) return;
+    try {
+      final token = await _messaging.getToken();
+      if (token == null) return;
+      await supabase
+          .from(AppConstants.tableFcmTokens)
+          .delete()
+          .eq('token', token);
+    } catch (e) {
+      // Token cleanup must never block sign-out.
+      if (kDebugMode) debugPrint('FCM removeToken failed: $e');
+    }
   }
 
   static void _setupForegroundHandler() {

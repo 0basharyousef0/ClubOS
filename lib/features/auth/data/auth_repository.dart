@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/fcm_service.dart';
 import '../../../core/supabase_client.dart';
 import '../../../shared/models/club_model.dart';
 import '../../../shared/models/user_club_role_model.dart';
@@ -43,6 +44,9 @@ class AuthRepository {
   }
 
   Future<void> signOut() async {
+    // Deregister this device first (needs the session's RLS scope);
+    // no-ops if Firebase isn't configured and never blocks sign-out.
+    await FcmService.removeToken();
     await supabase.auth.signOut();
   }
 
