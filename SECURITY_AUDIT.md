@@ -18,18 +18,20 @@ A foundational point frames every finding below: the `SUPABASE_ANON_KEY` shipped
 
 | # | Severity | Finding | Status |
 |---|----------|---------|--------|
-| 1 | **Critical** | Any user can self-appoint as approved President of any club | Open |
-| 2 | **High** | Task-attachments storage bucket is public + unrestricted upload | Open |
-| 3 | Medium | Notification spoofing / phishing (`notifications_insert` open) | Open |
-| 4 | Medium | Platform-wide PII harvesting (`profiles_select` open) | Open |
-| 5 | Medium | Club constitution readable across clubs | Open |
-| 6 | Medium | Edge function push-spam (optional webhook secret) | Open |
-| 7 | Medium | Email enumeration via anon RPC | Open |
-| 8 | Medium | Password-reset deep-link hijacking (custom URL scheme) | Open |
-| 9 | Medium | Forgeable audit log | Open |
-| 10 | Low | RSVP list visible to all members (spec: President only) | Open |
-| 11 | Low | Missing `WITH CHECK` on several UPDATE policies | Open |
-| 12 | Low | Unrestricted club creation (spam) | Open |
+| 1 | **Critical** | Any user can self-appoint as approved President of any club | **Fixed** — `20260627000000_rls_hardening.sql`, verified live 2026-07-02 |
+| 2 | **High** | Task-attachments storage bucket is public + unrestricted upload | **Fixed** — `20260627000001_storage_hardening.sql`, verified live 2026-07-02 |
+| 3 | Medium | Notification spoofing / phishing (`notifications_insert` open) | **Fixed** — policy dropped, verified live 2026-07-02 |
+| 4 | Medium | Platform-wide PII harvesting (`profiles_select` open) | **Fixed** — scoped to shared clubs, verified live 2026-07-02 |
+| 5 | Medium | Club constitution readable across clubs | **Fixed** — membership-gated + column-limited RPCs, verified live 2026-07-02 |
+| 6 | Medium | Edge function push-spam (optional webhook secret) | **Fixed** — fails closed; deployed function verified + webhook sends secret header |
+| 7 | Medium | Email enumeration via anon RPC | **Accepted risk** — deliberate login-UX tradeoff (see §4 MED-05) |
+| 8 | Medium | Password-reset deep-link hijacking (custom URL scheme) | **Open** — needs Universal Links / App Links on an owned domain |
+| 9 | Medium | Forgeable audit log | **Fixed** — policy dropped, verified live 2026-07-02 |
+| 10 | Low | RSVP list visible to all members (spec: President only) | **Fixed** — verified live 2026-07-02 |
+| 11 | Low | Missing `WITH CHECK` on several UPDATE policies | **Fixed** — verified live 2026-07-02 |
+| 12 | Low | Unrestricted club creation (spam) | **Fixed** — RPC rate-limited to 3/24h, verified live 2026-07-02 |
+
+**2026-07-02 follow-up:** `20260702000000_function_privilege_hardening.sql` additionally pins `search_path` on `check_email_exists` and revokes anon/PUBLIC `EXECUTE` on all SECURITY DEFINER RPCs and trigger functions (Supabase advisor warnings). Remaining advisor item requiring dashboard access: enable leaked-password protection (Auth → Passwords).
 
 ### Recommended remediation order
 
