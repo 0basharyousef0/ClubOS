@@ -5,7 +5,7 @@
 // so it fires for every in-app notification created by the DB triggers.
 //
 //   Required secret : FIREBASE_SERVICE_ACCOUNT  (full service-account JSON)
-//   Optional secret : WEBHOOK_SECRET            (extra shared-secret header)
+//   Required secret : WEBHOOK_SECRET            (shared-secret for webhook auth)
 //   Auto-provided   : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 //
 //   Deploy: supabase functions deploy send-push-notification
@@ -102,9 +102,12 @@ async function getAccessToken(sa: ServiceAccount): Promise<string> {
 
 Deno.serve(async (req) => {
   try {
-    // Optional extra guard — only enforced if WEBHOOK_SECRET is set.
+    // WEBHOOK_SECRET is mandatory — fail closed if not configured.
     const expected = Deno.env.get("WEBHOOK_SECRET");
-    if (expected && req.headers.get("x-webhook-secret") !== expected) {
+    if (!expected) {
+      return new Response("WEBHOOK_SECRET not configured", { status: 500 });
+    }
+    if (req.headers.get("x-webhook-secret") !== expected) {
       return new Response("Unauthorized", { status: 401 });
     }
 

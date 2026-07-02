@@ -47,38 +47,25 @@ class AuthRepository {
   }
 
   Future<List<ClubModel>> getClubs() async {
-    final response = await supabase
-        .from(AppConstants.tableClubs)
-        .select()
-        .order('name');
-    return (response as List).map((e) => ClubModel.fromJson(e)).toList();
+    final response = await supabase.rpc('list_clubs_for_dropdown');
+    return (response as List)
+        .map((e) => ClubModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<bool> isClubNameAvailable(String name) async {
-    final response = await supabase
-        .from(AppConstants.tableClubs)
-        .select('id')
-        .ilike('name', name.trim())
-        .maybeSingle();
-    return response == null;
+    final result = await supabase.rpc(
+      'check_club_name_available',
+      params: {'p_name': name.trim()},
+    );
+    return result as bool;
   }
 
   Future<void> createClub(String name) async {
-    final user = supabase.auth.currentUser!;
-
-    final clubRow = await supabase
-        .from(AppConstants.tableClubs)
-        .insert({'name': name.trim()})
-        .select()
-        .single();
-
-    await supabase.from(AppConstants.tableUserClubRoles).insert({
-      'user_id': user.id,
-      'club_id': clubRow['id'] as String,
-      'role': AppConstants.rolePresident,
-      'status': AppConstants.statusApproved,
-      'approved_by': user.id,
-    });
+    await supabase.rpc(
+      'create_club_with_president',
+      params: {'p_name': name.trim()},
+    );
   }
 
   Future<void> joinClub({
