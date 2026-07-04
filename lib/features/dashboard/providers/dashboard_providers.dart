@@ -22,9 +22,11 @@ final pendingApprovalsProvider =
 final myTasksProvider = FutureProvider<List<TaskModel>>((ref) async {
   final role = ref.watch(activeClubRoleProvider);
   if (role == null) return [];
-  return ref
-      .read(dashboardRepositoryProvider)
-      .getMyTasks(role.clubId, role.userId);
+  final repo = ref.read(dashboardRepositoryProvider);
+  // Presidents oversee rather than receive tasks, so their dashboard
+  // lists the club's assigned tasks (with assignee) instead.
+  if (role.isPresident) return repo.getClubTasks(role.clubId);
+  return repo.getMyTasks(role.clubId, role.userId);
 });
 
 final upcomingEventsProvider = FutureProvider<List<EventModel>>((ref) async {

@@ -34,6 +34,21 @@ class DashboardRepository {
         .toList();
   }
 
+  /// President dashboard: the club's active tasks with each assignee's
+  /// profile joined, soonest due first.
+  Future<List<TaskModel>> getClubTasks(String clubId) async {
+    final response = await supabase
+        .from(AppConstants.tableTasks)
+        .select('*, profiles!assigned_to(id, full_name, email)')
+        .eq('club_id', clubId)
+        .neq('status', AppConstants.taskComplete)
+        .order('due_date', ascending: true, nullsFirst: false)
+        .limit(3);
+    return (response as List)
+        .map((e) => TaskModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<EventModel>> getUpcomingEvents(String clubId) async {
     final now = DateTime.now().toIso8601String();
     final response = await supabase

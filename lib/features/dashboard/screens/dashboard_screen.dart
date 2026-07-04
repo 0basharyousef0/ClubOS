@@ -85,11 +85,14 @@ class DashboardScreen extends ConsumerWidget {
 
                     // ── Tasks ─────────────────────────────────────
                     _SectionHeader(
-                      title: 'My Tasks',
+                      title: role?.isPresident == true
+                          ? 'Assigned Tasks'
+                          : 'My Tasks',
                       onSeeAll: () => context.go('/tasks'),
                     ),
                     const SizedBox(height: 12),
-                    _TasksSection(ref: ref),
+                    _TasksSection(
+                        ref: ref, isPresident: role?.isPresident == true),
 
                     const SizedBox(height: 24),
 
@@ -494,7 +497,8 @@ class _PendingApprovalsCard extends ConsumerWidget {
 
 class _TasksSection extends ConsumerWidget {
   final WidgetRef ref;
-  const _TasksSection({required this.ref});
+  final bool isPresident;
+  const _TasksSection({required this.ref, this.isPresident = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -507,10 +511,14 @@ class _TasksSection extends ConsumerWidget {
       ),
       data: (tasks) {
         if (tasks.isEmpty) {
-          return const _EmptyState(
+          return _EmptyState(
             icon: Icons.task_alt_rounded,
-            message: 'You\'re all caught up!',
-            sub: 'No tasks assigned yet.',
+            message: isPresident
+                ? 'No active tasks.'
+                : 'You\'re all caught up!',
+            sub: isPresident
+                ? 'Tasks you assign to your team will appear here.'
+                : 'No tasks assigned yet.',
           );
         }
         return Column(children: tasks.map((t) => _TaskCard(task: t)).toList());
@@ -540,6 +548,8 @@ class _TaskCard extends StatelessWidget {
     'complete' => 'Complete',
     _ => 'Not Started',
   };
+
+  String? get _assignee => task.assignedToProfile?['full_name'] as String?;
 
   @override
   Widget build(BuildContext context) {
@@ -580,27 +590,58 @@ class _TaskCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (task.dueDate != null) ...[
+                    if (_assignee != null || task.dueDate != null) ...[
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(
-                            Icons.calendar_today_rounded,
-                            size: 11,
-                            color: task.isOverdue
-                                ? AppColors.error
-                                : AppColors.textSecondary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Due ${DateFormat('MMM d').format(task.dueDate!)}',
-                            style: TextStyle(
-                              fontSize: 12,
+                          // Assignee (only present on the president's
+                          // club-wide list, where profiles are joined)
+                          if (_assignee != null) ...[
+                            const Icon(
+                              Icons.person_outline_rounded,
+                              size: 11,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                _assignee!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                          if (_assignee != null && task.dueDate != null)
+                            const Text(
+                              '  ·  ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          if (task.dueDate != null) ...[
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              size: 11,
                               color: task.isOverdue
                                   ? AppColors.error
                                   : AppColors.textSecondary,
                             ),
-                          ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Due ${DateFormat('MMM d').format(task.dueDate!)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: task.isOverdue
+                                    ? AppColors.error
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
