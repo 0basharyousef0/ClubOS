@@ -27,7 +27,7 @@ class _TypewriterTaglineState extends State<TypewriterTagline> {
   static const _startDelay = Duration(milliseconds: 450);
   static const _charInterval = Duration(milliseconds: 140);
   static const _blinkInterval = Duration(milliseconds: 380);
-  static const _caretLinger = Duration(milliseconds: 2400);
+  static const _caretLinger = Duration(milliseconds: 3000);
 
   int _typed = 0;
   bool _caretOn = true;
