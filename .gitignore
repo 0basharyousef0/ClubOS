@@ -37,6 +37,11 @@ npm-debug.log*
 google-services.json
 GoogleService-Info.plist
 
+# Android release signing (never commit these)
+android/key.properties
+*.jks
+*.keystore
+
 # Claude Code local settings (contains personal tokens/secrets)
 .claude/settings.local.json
 
