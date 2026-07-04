@@ -9,9 +9,11 @@ import '../../../shared/widgets/tab_header_hero.dart';
 import '../../../core/supabase_client.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../../../features/notifications/providers/notifications_providers.dart';
+import '../../../features/polls/providers/polls_providers.dart';
 import '../../../shared/widgets/logout_sheet.dart';
 import '../../../shared/models/announcement_model.dart';
 import '../../../shared/models/event_model.dart';
+import '../../../shared/models/poll_model.dart';
 import '../../../shared/models/task_model.dart';
 import '../../../shared/models/user_club_role_model.dart';
 import '../providers/dashboard_providers.dart';
@@ -54,6 +56,7 @@ class DashboardScreen extends ConsumerWidget {
             ref.invalidate(myTasksProvider);
             ref.invalidate(upcomingEventsProvider);
             ref.invalidate(recentAnnouncementsProvider);
+            ref.invalidate(pollsProvider);
           },
           child: ListView(
             padding: EdgeInsets.zero,
@@ -83,19 +86,6 @@ class DashboardScreen extends ConsumerWidget {
                       const SizedBox(height: 24),
                     ],
 
-                    // ── Tasks ─────────────────────────────────────
-                    _SectionHeader(
-                      title: role?.isPresident == true
-                          ? 'Assigned Tasks'
-                          : 'My Tasks',
-                      onSeeAll: () => context.go('/tasks'),
-                    ),
-                    const SizedBox(height: 12),
-                    _TasksSection(
-                        ref: ref, isPresident: role?.isPresident == true),
-
-                    const SizedBox(height: 24),
-
                     // ── Events ────────────────────────────────────
                     _SectionHeader(
                       title: 'Upcoming Events',
@@ -113,6 +103,29 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     _AnnouncementsSection(ref: ref),
+
+                    const SizedBox(height: 24),
+
+                    // ── Tasks ─────────────────────────────────────
+                    _SectionHeader(
+                      title: role?.isPresident == true
+                          ? 'Assigned Tasks'
+                          : 'My Tasks',
+                      onSeeAll: () => context.go('/tasks'),
+                    ),
+                    const SizedBox(height: 12),
+                    _TasksSection(
+                        ref: ref, isPresident: role?.isPresident == true),
+
+                    const SizedBox(height: 24),
+
+                    // ── Active polls ──────────────────────────────
+                    _SectionHeader(
+                      title: 'Active Polls',
+                      onSeeAll: () => context.go('/polls'),
+                    ),
+                    const SizedBox(height: 12),
+                    _PollsSection(ref: ref),
 
                     const SizedBox(height: 40),
                   ],
@@ -552,6 +565,125 @@ class _TasksSection extends ConsumerWidget {
   // shows three full cards plus a sliver of the fourth under the fade.
   static const _visibleTaskCount = 3;
   static const _taskWindowHeight = 3 * 78.0 + 34.0;
+}
+
+class _PollsSection extends ConsumerWidget {
+  final WidgetRef ref;
+  const _PollsSection({required this.ref});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(pollsProvider);
+    return async.when(
+      loading: () => const _LoadingCard(),
+      error: (_, _) => const _EmptyState(
+        icon: Icons.error_outline_rounded,
+        message: 'Could not load polls.',
+      ),
+      data: (polls) {
+        final active = polls.where((p) => p.isOpen).take(3).toList();
+        if (active.isEmpty) {
+          return const _EmptyState(
+            icon: Icons.how_to_vote_rounded,
+            message: 'No active polls.',
+            sub: 'Polls you can vote on will appear here.',
+          );
+        }
+        return Column(
+            children: active.map((p) => _PollCard(poll: p)).toList());
+      },
+    );
+  }
+}
+
+class _PollCard extends StatelessWidget {
+  final PollModel poll;
+  const _PollCard({required this.poll});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.go('/polls/${poll.id}'),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.how_to_vote_rounded,
+                  color: AppColors.primary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    poll.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    poll.closesAt != null
+                        ? 'Closes ${DateFormat('MMM d').format(poll.closesAt!)}'
+                        : 'No close date',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: poll.hasVoted
+                    ? AppColors.success.withValues(alpha: 0.10)
+                    : AppColors.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                poll.hasVoted ? 'Voted' : 'Vote now',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color:
+                      poll.hasVoted ? AppColors.success : AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _TaskCard extends StatelessWidget {
