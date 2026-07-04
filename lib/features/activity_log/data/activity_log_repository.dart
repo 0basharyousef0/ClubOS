@@ -44,7 +44,9 @@ class ActivityLogRepository {
   Future<List<UserClubRoleModel>> getClubMembers(String clubId) async {
     final response = await supabase
         .from(AppConstants.tableUserClubRoles)
-        .select('*, profiles(id, full_name, email, created_at)')
+        // `profiles!user_id` disambiguates: user_club_roles has two FKs
+        // to profiles (user_id, approved_by), so a bare embed fails.
+        .select('*, profiles!user_id(id, full_name, email, created_at)')
         .eq('club_id', clubId)
         .eq('status', AppConstants.statusApproved)
         .order('role');

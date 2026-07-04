@@ -97,7 +97,9 @@ class TasksRepository {
   Future<List<UserClubRoleModel>> getApprovedMembers(String clubId) async {
     final response = await supabase
         .from(AppConstants.tableUserClubRoles)
-        .select('*, profiles(id, full_name, email)')
+        // `profiles!user_id` disambiguates: user_club_roles has two FKs
+        // to profiles (user_id, approved_by), so a bare embed fails.
+        .select('*, profiles!user_id(id, full_name, email)')
         .eq('club_id', clubId)
         .eq('status', AppConstants.statusApproved)
         .order('role');
