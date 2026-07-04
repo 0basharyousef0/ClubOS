@@ -149,6 +149,141 @@ class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
     }
   }
 
+  Future<void> _confirmClose(PollModel poll) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final bottomPadding = MediaQuery.of(ctx).padding.bottom;
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPadding + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 28),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.timer_off_rounded,
+                  color: AppColors.warning,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Close Poll Early?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                  children: [
+                    const TextSpan(text: '"'),
+                    TextSpan(
+                      text: poll.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const TextSpan(
+                        text: '" will stop accepting votes immediately. '
+                            'Results stay visible. This cannot be undone.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.warning,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  child: const Text('Close Poll'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  child: const Text('Keep Open'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(pollsRepositoryProvider).closePoll(poll.id);
+      ref.invalidate(pollDetailProvider(widget.pollId));
+      ref.invalidate(pollsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Poll closed.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not close poll. Try again.')),
+        );
+      }
+    }
+  }
+
   Future<void> _vote() async {
     if (_selectedOptionId == null) return;
     setState(() => _isVoting = true);
@@ -202,8 +337,10 @@ class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
           poll: poll,
           selectedOptionId: _selectedOptionId,
           isVoting: _isVoting,
+          isCreator: poll.createdBy == supabase.auth.currentUser?.id,
           onSelect: (id) => setState(() => _selectedOptionId = id),
           onVote: _vote,
+          onClose: () => _confirmClose(poll),
         ),
       ),
     );
@@ -214,15 +351,19 @@ class _PollBody extends StatelessWidget {
   final PollModel poll;
   final String? selectedOptionId;
   final bool isVoting;
+  final bool isCreator;
   final ValueChanged<String> onSelect;
   final VoidCallback onVote;
+  final VoidCallback onClose;
 
   const _PollBody({
     required this.poll,
     required this.selectedOptionId,
     required this.isVoting,
+    required this.isCreator,
     required this.onSelect,
     required this.onVote,
+    required this.onClose,
   });
 
   @override
@@ -316,6 +457,28 @@ class _PollBody extends StatelessWidget {
                   )
                 : const Text('Submit Vote'),
           ),
+        // Creator-only: end voting before the scheduled close date
+        if (isCreator && poll.isOpen) ...[
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: onClose,
+            icon: const Icon(Icons.timer_off_rounded, size: 18),
+            label: const Text('Close Poll Early'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.warning,
+              side: BorderSide(
+                  color: AppColors.warning.withValues(alpha: 0.45)),
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

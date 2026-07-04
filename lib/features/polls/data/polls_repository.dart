@@ -134,4 +134,12 @@ class PollsRepository {
   Future<void> deletePoll(String id) async {
     await supabase.from(AppConstants.tablePolls).delete().eq('id', id);
   }
+
+  /// Ends voting now. RLS (`polls_update`) restricts this to the creator.
+  Future<void> closePoll(String id) async {
+    await supabase
+        .from(AppConstants.tablePolls)
+        .update({'closes_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('id', id);
+  }
 }
