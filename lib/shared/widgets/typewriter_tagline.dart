@@ -23,11 +23,13 @@ class TypewriterTagline extends StatefulWidget {
   State<TypewriterTagline> createState() => _TypewriterTaglineState();
 }
 
-class _TypewriterTaglineState extends State<TypewriterTagline> {
+class _TypewriterTaglineState extends State<TypewriterTagline>
+    with SingleTickerProviderStateMixin {
   static const _startDelay = Duration(milliseconds: 450);
   static const _charInterval = Duration(milliseconds: 140);
   static const _blinkInterval = Duration(milliseconds: 380);
   static const _caretLinger = Duration(milliseconds: 3000);
+  static const _glowHalf = Duration(milliseconds: 250);
 
   int _typed = 0;
   bool _caretOn = true;
@@ -36,10 +38,13 @@ class _TypewriterTaglineState extends State<TypewriterTagline> {
   Timer? _typeTimer;
   Timer? _blinkTimer;
   Timer? _lingerTimer;
+  late final AnimationController _glow;
 
   @override
   void initState() {
     super.initState();
+    _glow = AnimationController(vsync: this, duration: _glowHalf)
+      ..addListener(() => setState(() {}));
     _blinkTimer = Timer.periodic(_blinkInterval, (_) {
       if (!_caretGone) setState(() => _caretOn = !_caretOn);
     });
@@ -48,6 +53,8 @@ class _TypewriterTaglineState extends State<TypewriterTagline> {
         setState(() => _typed++);
         if (_typed >= widget.word.length) {
           t.cancel();
+          // Flash the finished word: glow up, then back down.
+          _glow.forward().then((_) => _glow.reverse());
           _lingerTimer = Timer(_caretLinger, () {
             setState(() => _caretGone = true);
           });
@@ -62,6 +69,7 @@ class _TypewriterTaglineState extends State<TypewriterTagline> {
     _typeTimer?.cancel();
     _blinkTimer?.cancel();
     _lingerTimer?.cancel();
+    _glow.dispose();
     super.dispose();
   }
 
@@ -78,7 +86,22 @@ class _TypewriterTaglineState extends State<TypewriterTagline> {
         style: widget.style,
         children: [
           TextSpan(text: widget.prefix),
-          TextSpan(text: typed),
+          TextSpan(
+            text: typed,
+            style: TextStyle(
+              color: Color.lerp(
+                  widget.style.color ?? Colors.white, Colors.white, _glow.value),
+              shadows: _glow.value == 0
+                  ? null
+                  : [
+                      Shadow(
+                        color: Colors.white
+                            .withValues(alpha: 0.85 * _glow.value),
+                        blurRadius: 14 * _glow.value,
+                      ),
+                    ],
+            ),
+          ),
           WidgetSpan(
             alignment: PlaceholderAlignment.middle,
             child: Container(
