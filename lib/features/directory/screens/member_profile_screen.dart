@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/supabase_client.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../../../shared/models/user_club_role_model.dart';
+import '../../../shared/widgets/copy_icon_button.dart';
 import '../providers/directory_providers.dart';
 import '../widgets/role_pill.dart';
 
@@ -218,12 +219,14 @@ class _ProfileBody extends StatelessWidget {
                 icon: Icons.school_outlined,
                 label: 'University Email',
                 value: email.isNotEmpty ? email : '—',
+                copyable: email.isNotEmpty,
               ),
               const Divider(height: 20),
               _InfoRow(
                 icon: Icons.alternate_email,
                 label: 'Personal Email',
                 value: personalEmail.isNotEmpty ? personalEmail : '—',
+                copyable: personalEmail.isNotEmpty,
               ),
               const Divider(height: 20),
               _InfoRow(
@@ -296,15 +299,18 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+  final bool copyable;
   const _InfoRow({
     required this.icon,
     required this.label,
     required this.value,
+    this.copyable = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 16, color: AppColors.textSecondary),
         const SizedBox(width: 8),
@@ -314,16 +320,27 @@ class _InfoRow extends StatelessWidget {
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Wraps to more lines rather than truncating long values
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (copyable) ...[
+                const SizedBox(width: 4),
+                CopyIconButton(text: value),
+              ],
+            ],
           ),
         ),
       ],
