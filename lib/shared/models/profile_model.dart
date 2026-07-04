@@ -8,14 +8,15 @@ class ProfileModel {
   /// Optional personal contact email, shown in the directory.
   final String? personalEmail;
 
-  final DateTime createdAt;
+  /// Null when a query embeds only a subset of profile columns.
+  final DateTime? createdAt;
 
   const ProfileModel({
     required this.id,
     required this.fullName,
     required this.email,
     this.personalEmail,
-    required this.createdAt,
+    this.createdAt,
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) => ProfileModel(
@@ -23,6 +24,8 @@ class ProfileModel {
         fullName: json['full_name'] as String,
         email: json['email'] as String,
         personalEmail: json['personal_email'] as String?,
-        createdAt: DateTime.parse(json['created_at'] as String),
+        createdAt: json['created_at'] != null
+            ? DateTime.parse(json['created_at'] as String)
+            : null,
       );
 }

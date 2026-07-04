@@ -39,14 +39,12 @@ class ActivityLogRepository {
   }
 
   /// Approved members of the club — powers the "filter by member" picker.
-  /// `created_at` is included in the embed because [UserClubRoleModel]'s nested
-  /// profile parsing requires it.
   Future<List<UserClubRoleModel>> getClubMembers(String clubId) async {
     final response = await supabase
         .from(AppConstants.tableUserClubRoles)
         // `profiles!user_id` disambiguates: user_club_roles has two FKs
         // to profiles (user_id, approved_by), so a bare embed fails.
-        .select('*, profiles!user_id(id, full_name, email, created_at)')
+        .select('*, profiles!user_id(id, full_name, email)')
         .eq('club_id', clubId)
         .eq('status', AppConstants.statusApproved)
         .order('role');
