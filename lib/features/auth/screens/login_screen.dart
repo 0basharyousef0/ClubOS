@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/theme.dart';
 import '../../../shared/widgets/app_logo.dart';
+import '../../../shared/widgets/typewriter_tagline.dart';
 import '../providers/auth_providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -184,8 +185,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        'Club management, simplified.',
+                      TypewriterTagline(
+                        prefix: 'Club management, ',
+                        word: 'simplified.',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.72),
                           fontSize: 14,
