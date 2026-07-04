@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -7,7 +8,6 @@ import '../../../app/theme.dart';
 import '../../../core/supabase_client.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../../../shared/models/user_club_role_model.dart';
-import '../../../shared/widgets/copy_icon_button.dart';
 import '../providers/directory_providers.dart';
 import '../widgets/role_pill.dart';
 
@@ -307,10 +307,37 @@ class _InfoRow extends StatelessWidget {
     this.copyable = false,
   });
 
+  void _copy(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: value));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Copied $value'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 1400),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Long values (emails) scale down slightly to stay on one line
+    // rather than truncating or wrapping awkwardly.
+    final text = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerRight,
+      child: Text(
+        value,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
+    );
+
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 16, color: AppColors.textSecondary),
         const SizedBox(width: 8),
@@ -320,28 +347,9 @@ class _InfoRow extends StatelessWidget {
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Wraps to more lines rather than truncating long values
-              Flexible(
-                child: Text(
-                  value,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              if (copyable) ...[
-                const SizedBox(width: 4),
-                CopyIconButton(text: value),
-              ],
-            ],
-          ),
+          child: copyable
+              ? GestureDetector(onTap: () => _copy(context), child: text)
+              : text,
         ),
       ],
     );

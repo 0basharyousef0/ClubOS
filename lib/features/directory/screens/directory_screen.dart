@@ -7,7 +7,6 @@ import '../../../app/theme.dart';
 import '../../../core/supabase_client.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../../../shared/models/user_club_role_model.dart';
-import '../../../shared/widgets/copy_icon_button.dart';
 import '../../../shared/widgets/gradient_header.dart';
 import '../providers/directory_providers.dart';
 import '../widgets/role_pill.dart';
@@ -183,33 +182,6 @@ class _DirectoryBody extends StatelessWidget {
   }
 }
 
-/// Email line on a member card: wraps fully instead of truncating,
-/// with a copy button alongside.
-class _EmailLine extends StatelessWidget {
-  final String email;
-  const _EmailLine({required this.email});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Flexible(
-          child: Text(
-            email,
-            style: const TextStyle(
-              fontSize: 12.5,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-        const SizedBox(width: 2),
-        CopyIconButton(text: email),
-      ],
-    );
-  }
-}
-
 class _MemberCard extends StatelessWidget {
   final UserClubRoleModel member;
   final bool isCurrentUser;
@@ -272,11 +244,27 @@ class _MemberCard extends StatelessWidget {
                   ),
                   if (email.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    _EmailLine(email: email),
+                    Text(
+                      email,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                   if (personalEmail.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    _EmailLine(email: personalEmail),
+                    Text(
+                      personalEmail,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ],
               ),
