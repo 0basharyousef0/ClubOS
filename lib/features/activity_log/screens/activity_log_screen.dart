@@ -36,13 +36,42 @@ class ActivityLogScreen extends ConsumerWidget {
                 ),
               ),
               trailing: filter.isActive
-                  ? TextButton(
-                      onPressed: () => ref
-                          .read(activityFilterProvider.notifier)
-                          .state = const ActivityFilter(),
-                      style:
-                          TextButton.styleFrom(foregroundColor: Colors.white),
-                      child: const Text('Clear'),
+                  ? Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => ref
+                            .read(activityFilterProvider.notifier)
+                            .state = const ActivityFilter(),
+                        // Pill styled to match GradientHeaderBadge so it
+                        // reads as a button on the gradient header
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.25)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.filter_alt_off_rounded,
+                                  color: Colors.white, size: 14),
+                              SizedBox(width: 6),
+                              Text(
+                                'Clear filters',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     )
                   : null,
             ),
