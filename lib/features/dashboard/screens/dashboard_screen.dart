@@ -521,10 +521,37 @@ class _TasksSection extends ConsumerWidget {
                 : 'No tasks assigned yet.',
           );
         }
-        return Column(children: tasks.map((t) => _TaskCard(task: t)).toList());
+        final column =
+            Column(children: tasks.map((t) => _TaskCard(task: t)).toList());
+
+        // Show the list as-is while it fits; once it overflows the
+        // section's window, clip it and fade the bottom edge to hint
+        // that "See all" has more.
+        if (tasks.length <= _visibleTaskCount) return column;
+        return ShaderMask(
+          shaderCallback: (rect) => const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.black, Colors.black, Colors.transparent],
+            stops: [0.0, 0.68, 1.0],
+          ).createShader(rect),
+          blendMode: BlendMode.dstIn,
+          child: SizedBox(
+            height: _taskWindowHeight,
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: column,
+            ),
+          ),
+        );
       },
     );
   }
+
+  // A task card is ~78px tall (68px content + 10px gap); the window
+  // shows three full cards plus a sliver of the fourth under the fade.
+  static const _visibleTaskCount = 3;
+  static const _taskWindowHeight = 3 * 78.0 + 34.0;
 }
 
 class _TaskCard extends StatelessWidget {
