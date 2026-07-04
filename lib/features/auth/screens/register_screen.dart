@@ -18,6 +18,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _personalEmailController = TextEditingController();
   final _passwordController = TextEditingController();
   String _selectedRole = AppConstants.roleDirector;
   bool _isLoading = false;
@@ -28,6 +29,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _personalEmailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -43,6 +45,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             email: _emailController.text.trim(),
             password: _passwordController.text,
             fullName: _nameController.text.trim(),
+            personalEmail: _personalEmailController.text.trim(),
             intendedRole: _selectedRole,
           );
       if (mounted) {
@@ -113,14 +116,42 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         autocorrect: false,
                         textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.email_outlined),
+                          labelText: 'University Email',
+                          helperText: 'You\'ll use this to log in',
+                          prefixIcon: Icon(Icons.school_outlined),
                         ),
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) {
-                            return 'Email is required';
+                            return 'University email is required';
                           }
                           if (!v.contains('@')) return 'Enter a valid email';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _personalEmailController,
+                        keyboardType: TextInputType.emailAddress,
+                        autocorrect: false,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Personal Email',
+                          helperText:
+                              'Shown in the club directory as an extra way '
+                              'to reach you',
+                          helperMaxLines: 2,
+                          prefixIcon: Icon(Icons.alternate_email),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Personal email is required';
+                          }
+                          if (!v.contains('@')) return 'Enter a valid email';
+                          if (v.trim().toLowerCase() ==
+                              _emailController.text.trim().toLowerCase()) {
+                            return 'Must be different from your university '
+                                'email';
+                          }
                           return null;
                         },
                       ),

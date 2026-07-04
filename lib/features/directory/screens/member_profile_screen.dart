@@ -150,6 +150,7 @@ class _ProfileBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = member.profile?.fullName ?? 'Unknown';
     final email = member.profile?.email ?? '';
+    final personalEmail = member.profile?.personalEmail ?? '';
     final color = roleColor(member.role);
 
     return ListView(
@@ -214,9 +215,15 @@ class _ProfileBody extends StatelessWidget {
           child: Column(
             children: [
               _InfoRow(
-                icon: Icons.email_outlined,
-                label: 'Email',
+                icon: Icons.school_outlined,
+                label: 'University Email',
                 value: email.isNotEmpty ? email : '—',
+              ),
+              const Divider(height: 20),
+              _InfoRow(
+                icon: Icons.alternate_email,
+                label: 'Personal Email',
+                value: personalEmail.isNotEmpty ? personalEmail : '—',
               ),
               const Divider(height: 20),
               _InfoRow(

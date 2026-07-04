@@ -30,12 +30,17 @@ class AuthRepository {
     required String email,
     required String password,
     required String fullName,
+    required String personalEmail,
     required String intendedRole,
   }) async {
     return supabase.auth.signUp(
       email: email,
       password: password,
-      data: {'full_name': fullName, 'intended_role': intendedRole},
+      data: {
+        'full_name': fullName,
+        'personal_email': personalEmail,
+        'intended_role': intendedRole,
+      },
     );
   }
 

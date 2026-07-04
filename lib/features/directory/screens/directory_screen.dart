@@ -99,7 +99,10 @@ class _DirectoryBody extends StatelessWidget {
         : members.where((m) {
             final name = (m.profile?.fullName ?? '').toLowerCase();
             final email = (m.profile?.email ?? '').toLowerCase();
-            return name.contains(q) || email.contains(q);
+            final personal = (m.profile?.personalEmail ?? '').toLowerCase();
+            return name.contains(q) ||
+                email.contains(q) ||
+                personal.contains(q);
           }).toList();
 
     return Column(
@@ -188,6 +191,7 @@ class _MemberCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = member.profile?.fullName ?? 'Unknown';
     final email = member.profile?.email ?? '';
+    final personalEmail = member.profile?.personalEmail ?? '';
     final color = roleColor(member.role);
 
     return GestureDetector(
@@ -242,6 +246,18 @@ class _MemberCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       email,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (personalEmail.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      personalEmail,
                       style: const TextStyle(
                         fontSize: 12.5,
                         color: AppColors.textSecondary,
