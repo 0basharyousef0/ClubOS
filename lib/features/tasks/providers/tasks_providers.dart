@@ -44,10 +44,19 @@ final taskAttachmentsProvider =
   return ref.read(tasksRepositoryProvider).getAttachments(taskId);
 });
 
-// Approved club members for assignment picker
+// Approved club members for the assignment picker, limited to the
+// tier below the assigner: presidents assign to VPs, VPs to directors.
 final clubMembersProvider =
     FutureProvider<List<UserClubRoleModel>>((ref) async {
   final role = ref.watch(activeClubRoleProvider);
   if (role == null) return [];
-  return ref.read(tasksRepositoryProvider).getApprovedMembers(role.clubId);
+  final members =
+      await ref.read(tasksRepositoryProvider).getApprovedMembers(role.clubId);
+  if (role.isPresident) {
+    return members.where((m) => m.isVicePresident).toList();
+  }
+  if (role.isVicePresident) {
+    return members.where((m) => m.isDirector).toList();
+  }
+  return [];
 });
