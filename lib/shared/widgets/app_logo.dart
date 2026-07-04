@@ -10,21 +10,24 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final image = Image.asset(
-      'assets/images/logo.png',
-      width: size,
-      height: size,
-      fit: BoxFit.contain,
+    // The PNG is full-bleed artwork, so clip it into the rounded square
+    // and let it cover the tile edge to edge (app-icon style).
+    final tileSize = size * 1.18;
+    final tile = ClipRRect(
+      borderRadius: BorderRadius.circular(tileSize * 0.24),
+      child: Image.asset(
+        'assets/images/logo.png',
+        width: tileSize,
+        height: tileSize,
+        fit: BoxFit.cover,
+      ),
     );
 
     if (onDark) {
-      // On purple background: white card with subtle glow so the logo stands out
+      // On purple background: subtle glow so the logo stands out
       return Container(
-        width: size * 1.18,
-        height: size * 1.18,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(size * 0.28),
+          borderRadius: BorderRadius.circular(tileSize * 0.24),
           boxShadow: [
             BoxShadow(
               color: Colors.white.withValues(alpha: 0.30),
@@ -33,12 +36,11 @@ class AppLogo extends StatelessWidget {
             ),
           ],
         ),
-        padding: EdgeInsets.all(size * 0.09),
-        child: image,
+        child: tile,
       );
     }
 
-    // On light background: just the image with a soft primary-color glow ring
+    // On light background: soft primary-color glow ring behind the tile
     return Stack(
       alignment: Alignment.center,
       children: [
@@ -50,7 +52,7 @@ class AppLogo extends StatelessWidget {
             color: AppColors.primary.withValues(alpha: 0.07),
           ),
         ),
-        image,
+        tile,
       ],
     );
   }
