@@ -63,6 +63,17 @@ class _ClubSelectScreenState extends ConsumerState<ClubSelectScreen> {
     return base.isEmpty ? 'Director' : '$base Director';
   }
 
+  /// Directors can't join a club that has no approved VPs.
+  bool _directorJoinBlocked(String role) {
+    if (role != AppConstants.roleDirector || _selectedClub == null) {
+      return false;
+    }
+    return ref.watch(_clubVpsProvider(_selectedClub!.id)).maybeWhen(
+          data: (vps) => vps.isEmpty,
+          orElse: () => false,
+        );
+  }
+
   Future<void> _joinClub() async {
     if (_selectedClub == null) return;
 
@@ -83,13 +94,18 @@ class _ClubSelectScreenState extends ConsumerState<ClubSelectScreen> {
     } else if (role == AppConstants.roleDirector) {
       final vps =
           ref.read(_clubVpsProvider(_selectedClub!.id)).valueOrNull ?? [];
-      if (vps.isNotEmpty && _selectedVp == null) {
+      // Directors always work under a VP — no VPs means no director joins.
+      if (vps.isEmpty) {
+        setState(() => _errorMessage =
+            'This club has no VPs yet, so directors can\'t join it.');
+        return;
+      }
+      if (_selectedVp == null) {
         setState(() =>
             _errorMessage = 'Please select the VP you work under.');
         return;
       }
-      // A club with no VPs yet: join with the general Director title.
-      roleTitle = _selectedVp == null ? null : directorTitleFor(_selectedVp!);
+      roleTitle = directorTitleFor(_selectedVp!);
     }
 
     setState(() {
@@ -228,8 +244,11 @@ class _ClubSelectScreenState extends ConsumerState<ClubSelectScreen> {
               ],
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed:
-                    (_selectedClub == null || _isLoading) ? null : _joinClub,
+                onPressed: (_selectedClub == null ||
+                        _isLoading ||
+                        _directorJoinBlocked(role))
+                    ? null
+                    : _joinClub,
                 child: _isLoading
                     ? const SizedBox(
                         height: 20,
@@ -316,18 +335,20 @@ class _VpPicker extends StatelessWidget {
           return Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.06),
+              color: AppColors.warning.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
                 const Icon(Icons.info_outline,
-                    color: AppColors.primary, size: 18),
+                    color: AppColors.warning, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'This club has no VPs yet — you\'ll join with the '
-                    'general Director title.',
+                    'This club has no VPs yet. Directors work under a VP, '
+                    'so you can\'t join until a VP has been approved.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
