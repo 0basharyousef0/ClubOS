@@ -670,7 +670,11 @@ class _PollCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                poll.hasVoted ? 'Voted' : 'Vote now',
+                poll.hasVoted
+                    ? 'Voted'
+                    : poll.canVote
+                        ? 'Vote now'
+                        : 'View',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,

@@ -117,6 +117,9 @@ class _ClubSelectScreenState extends ConsumerState<ClubSelectScreen> {
             clubId: _selectedClub!.id,
             role: role,
             roleTitle: roleTitle,
+            reportsTo: role == AppConstants.roleDirector
+                ? (_selectedVp?['user_id'] as String?)
+                : null,
           );
       ref.invalidate(userClubRolesProvider);
       if (mounted) context.go('/pending-approval');

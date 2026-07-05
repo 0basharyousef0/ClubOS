@@ -93,6 +93,7 @@ class AuthRepository {
     required String clubId,
     required String role,
     String? roleTitle,
+    String? reportsTo,
   }) async {
     final user = supabase.auth.currentUser!;
 
@@ -103,6 +104,9 @@ class AuthRepository {
       'status': AppConstants.statusPending,
       if (roleTitle != null && roleTitle.trim().isNotEmpty)
         'role_title': roleTitle.trim(),
+      // Directors record which VP they work under (drives the
+      // "My Directors" poll audience).
+      'reports_to': ?reportsTo,
     });
 
     // Notify the president via a SECURITY DEFINER RPC — a pending user

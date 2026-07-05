@@ -43,6 +43,8 @@ class AppConstants {
   static const String audienceAll = 'all';
   static const String audienceVpsOnly = 'vps_only';
   static const String audienceDirectorsOnly = 'directors_only';
+  static const String audienceMyDirectors = 'my_directors';
+  static const String audienceCustom = 'custom';
 
   // Notification types
   static const String notifTaskAssigned = 'task_assigned';
@@ -53,6 +55,7 @@ class AppConstants {
   static const String notifJoinRequest = 'join_request';
 
   // Activity log action types
+  static const String actionPollCreated = 'poll_created';
   static const String actionTaskAssigned = 'task_assigned';
   static const String actionTaskCompleted = 'task_completed';
   static const String actionTaskStarted = 'task_started';

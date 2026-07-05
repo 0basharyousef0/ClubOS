@@ -26,6 +26,7 @@ class _PollCreateScreenState extends ConsumerState<PollCreateScreen> {
 
   bool _isYesNo = true;
   String? _audience;
+  final Set<String> _customVoterIds = {};
   DateTime? _closesAt;
   TimeOfDay _closingTime = const TimeOfDay(hour: 23, minute: 59);
   bool _isLoading = false;
@@ -61,6 +62,12 @@ class _PollCreateScreenState extends ConsumerState<PollCreateScreen> {
           () => _errorMessage = 'Please add at least 2 options.');
       return;
     }
+    if (_audience == AppConstants.audienceCustom &&
+        _customVoterIds.isEmpty) {
+      setState(() =>
+          _errorMessage = 'Please select at least one member to vote.');
+      return;
+    }
 
     final role = ref.read(activeClubRoleProvider);
     if (role == null) return;
@@ -70,7 +77,22 @@ class _PollCreateScreenState extends ConsumerState<PollCreateScreen> {
       _errorMessage = null;
     });
     try {
-      await ref.read(pollsRepositoryProvider).createPoll(
+      final repo = ref.read(pollsRepositoryProvider);
+      final eligible = await repo.resolveAudience(
+        clubId: role.clubId,
+        audience: _audience!,
+        customUserIds: _customVoterIds.toList(),
+      );
+      if (eligible.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = _audience == AppConstants.audienceMyDirectors
+              ? 'No directors report to you yet.'
+              : 'This audience has no members.';
+        });
+        return;
+      }
+      await repo.createPoll(
             clubId: role.clubId,
             title: _titleController.text.trim(),
             description: _descController.text.trim().isEmpty
@@ -78,6 +100,7 @@ class _PollCreateScreenState extends ConsumerState<PollCreateScreen> {
                 : _descController.text.trim(),
             audience: _audience!,
             options: options,
+            eligibleUserIds: eligible,
             closesAt: _closesAt,
           );
       ref.invalidate(pollsProvider);
@@ -131,10 +154,13 @@ class _PollCreateScreenState extends ConsumerState<PollCreateScreen> {
         ? [
             (value: AppConstants.audienceAll, label: 'All Members'),
             (value: AppConstants.audienceVpsOnly, label: 'VPs & President only'),
+            (value: AppConstants.audienceCustom, label: 'Custom — pick members'),
           ]
         : [
             (value: AppConstants.audienceAll, label: 'All Members'),
-            (value: AppConstants.audienceDirectorsOnly, label: 'Directors only'),
+            (value: AppConstants.audienceVpsOnly, label: 'VPs & President only'),
+            (value: AppConstants.audienceMyDirectors, label: 'My Directors'),
+            (value: AppConstants.audienceCustom, label: 'Custom — pick members'),
           ];
 
     return Scaffold(
@@ -264,6 +290,17 @@ class _PollCreateScreenState extends ConsumerState<PollCreateScreen> {
                             onTap: () =>
                                 setState(() => _audience = opt.value),
                           )),
+                      if (_audience == AppConstants.audienceCustom) ...[
+                        const SizedBox(height: 8),
+                        _MemberChecklist(
+                          selectedIds: _customVoterIds,
+                          onToggle: (id) => setState(() {
+                            _customVoterIds.contains(id)
+                                ? _customVoterIds.remove(id)
+                                : _customVoterIds.add(id);
+                          }),
+                        ),
+                      ],
 
                       const SizedBox(height: 24),
 
@@ -379,6 +416,68 @@ class _PollCreateScreenState extends ConsumerState<PollCreateScreen> {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MemberChecklist extends ConsumerWidget {
+  final Set<String> selectedIds;
+  final ValueChanged<String> onToggle;
+
+  const _MemberChecklist({
+    required this.selectedIds,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final membersAsync = ref.watch(pollMemberPickerProvider);
+    final myUserId = ref.watch(activeClubRoleProvider)?.userId;
+
+    return membersAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      error: (_, _) => const Text('Could not load members.',
+          style: TextStyle(color: AppColors.error, fontSize: 13)),
+      data: (members) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          children: [
+            for (final m in members)
+              CheckboxListTile(
+                dense: true,
+                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: AppColors.primary,
+                value: selectedIds.contains(m.userId),
+                onChanged: (_) => onToggle(m.userId),
+                title: Text(
+                  m.userId == myUserId
+                      ? '${m.profile?.fullName ?? 'Member'} (You)'
+                      : m.profile?.fullName ?? 'Member',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+                subtitle: Text(
+                  m.roleDisplayName,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ),
           ],
         ),
       ),

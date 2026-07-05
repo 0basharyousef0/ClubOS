@@ -3,6 +3,20 @@ import '../../../core/supabase_client.dart';
 import '../../../shared/models/poll_model.dart';
 
 class PollsRepository {
+  /// Poll ids (of the given ones) where the current user may vote.
+  Future<Set<String>> _myEligiblePollIds(List<String> pollIds) async {
+    if (pollIds.isEmpty) return {};
+    final userId = supabase.auth.currentUser!.id;
+    final rows = await supabase
+        .from('poll_eligible_voters')
+        .select('poll_id')
+        .eq('user_id', userId)
+        .inFilter('poll_id', pollIds);
+    return (rows as List)
+        .map((r) => (r as Map<String, dynamic>)['poll_id'] as String)
+        .toSet();
+  }
+
   Future<List<PollModel>> getPolls(String clubId) async {
     final userId = supabase.auth.currentUser!.id;
 
@@ -11,6 +25,10 @@ class PollsRepository {
         .select('*, poll_options(*)')
         .eq('club_id', clubId)
         .order('created_at', ascending: false);
+
+    final eligibleIds = await _myEligiblePollIds([
+      for (final row in response as List) (row as Map)['id'] as String,
+    ]);
 
     final polls = <PollModel>[];
     for (final row in response as List) {
@@ -50,6 +68,7 @@ class PollsRepository {
         }).toList(),
         'my_vote_option_id': myVote?['option_id'],
         'total_votes': totalVotes,
+        'can_vote': eligibleIds.contains(pollId),
       }));
     }
     return polls;
@@ -84,12 +103,45 @@ class PollsRepository {
         })
         .toList();
 
+    final eligibleIds = await _myEligiblePollIds([pollId]);
+
     return PollModel.fromJson({
       ...row,
       'poll_options': options,
       'my_vote_option_id': myVote?['option_id'],
       'total_votes': totalVotes,
+      'can_vote': eligibleIds.contains(pollId),
     });
+  }
+
+  /// Resolves an audience choice to concrete voter user-ids. Custom
+  /// audiences pass their hand-picked list through untouched.
+  Future<List<String>> resolveAudience({
+    required String clubId,
+    required String audience,
+    List<String> customUserIds = const [],
+  }) async {
+    if (audience == AppConstants.audienceCustom) return customUserIds;
+
+    final userId = supabase.auth.currentUser!.id;
+    final rows = await supabase
+        .from(AppConstants.tableUserClubRoles)
+        .select('user_id, role, reports_to')
+        .eq('club_id', clubId)
+        .eq('status', AppConstants.statusApproved);
+
+    return [
+      for (final r in (rows as List).cast<Map<String, dynamic>>())
+        if (switch (audience) {
+          AppConstants.audienceAll => true,
+          AppConstants.audienceVpsOnly => r['role'] == 'president' ||
+              r['role'] == 'vice_president',
+          AppConstants.audienceMyDirectors =>
+            r['role'] == 'director' && r['reports_to'] == userId,
+          _ => false,
+        })
+          r['user_id'] as String,
+    ];
   }
 
   Future<void> createPoll({
@@ -98,6 +150,7 @@ class PollsRepository {
     String? description,
     required String audience,
     required List<String> options,
+    required List<String> eligibleUserIds,
     DateTime? closesAt,
   }) async {
     final userId = supabase.auth.currentUser!.id;
@@ -120,6 +173,13 @@ class PollsRepository {
     await supabase.from(AppConstants.tablePollOptions).insert(
           options.map((text) => {'poll_id': pollId, 'text': text}).toList(),
         );
+
+    // Snapshot who can see/vote this poll; visibility, voting and
+    // auto-close all key off this list.
+    await supabase.from('poll_eligible_voters').insert([
+      for (final id in eligibleUserIds.toSet())
+        {'poll_id': pollId, 'user_id': id},
+    ]);
   }
 
   Future<void> vote(String pollId, String optionId) async {

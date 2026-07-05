@@ -33,6 +33,10 @@ class PollModel {
   final String? myVoteOptionId;
   final int totalVotes;
 
+  /// Whether the current user is on this poll's eligible-voter list.
+  /// Creators always see their poll but may not be eligible to vote.
+  final bool canVote;
+
   const PollModel({
     required this.id,
     required this.clubId,
@@ -45,6 +49,7 @@ class PollModel {
     this.options = const [],
     this.myVoteOptionId,
     this.totalVotes = 0,
+    this.canVote = false,
   });
 
   bool get isOpen => closesAt == null || closesAt!.isAfter(DateTime.now());
@@ -54,6 +59,8 @@ class PollModel {
         'all' => 'All Members',
         'vps_only' => 'VPs & President',
         'directors_only' => 'Directors Only',
+        'my_directors' => 'My Directors',
+        'custom' => 'Selected Members',
         _ => audience,
       };
 
@@ -73,5 +80,6 @@ class PollModel {
             .toList(),
         myVoteOptionId: json['my_vote_option_id'] as String?,
         totalVotes: json['total_votes'] as int? ?? 0,
+        canVote: json['can_vote'] as bool? ?? false,
       );
 }

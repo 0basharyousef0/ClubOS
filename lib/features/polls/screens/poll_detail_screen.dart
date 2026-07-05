@@ -368,7 +368,9 @@ class _PollBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showResults = poll.hasVoted || !poll.isOpen;
+    // Non-eligible viewers (e.g. a creator not on their own voter
+    // list) go straight to results — no voting controls.
+    final showResults = poll.hasVoted || !poll.isOpen || !poll.canVote;
 
     return ListView(
       padding: const EdgeInsets.all(24),
@@ -443,6 +445,23 @@ class _PollBody extends StatelessWidget {
                 selected: selectedOptionId == opt.id,
                 onTap: () => onSelect(opt.id),
               )),
+        if (!poll.canVote && poll.isOpen && !poll.hasVoted) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.visibility_outlined,
+                  size: 15, color: AppColors.textSecondary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'View only — you\'re not in this poll\'s voters.',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 24),
         if (!showResults && poll.isOpen)
           ElevatedButton(

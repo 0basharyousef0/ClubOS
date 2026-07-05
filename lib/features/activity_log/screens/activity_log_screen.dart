@@ -610,6 +610,7 @@ void _showMemberPicker(
 // ── Action-type display helpers ─────────────────────────────────
 
 const _actionTypes = <String>[
+  AppConstants.actionPollCreated,
   AppConstants.actionTaskAssigned,
   AppConstants.actionTaskCompleted,
   AppConstants.actionTaskStarted,
@@ -619,6 +620,7 @@ const _actionTypes = <String>[
 ];
 
 String _actionLabel(String type) => switch (type) {
+  AppConstants.actionPollCreated => 'New Polls',
   AppConstants.actionTaskAssigned => 'Assigned',
   AppConstants.actionTaskCompleted => 'Completed',
   AppConstants.actionTaskStarted => 'Started',
@@ -629,6 +631,7 @@ String _actionLabel(String type) => switch (type) {
 };
 
 String _actionSentence(String type) => switch (type) {
+  AppConstants.actionPollCreated => 'Created a poll',
   AppConstants.actionTaskAssigned => 'Assigned a task',
   AppConstants.actionTaskCompleted => 'Completed a task',
   AppConstants.actionTaskStarted => 'Started a task',
@@ -639,6 +642,7 @@ String _actionSentence(String type) => switch (type) {
 };
 
 IconData _actionIcon(String type) => switch (type) {
+  AppConstants.actionPollCreated => Icons.poll_outlined,
   AppConstants.actionTaskAssigned => Icons.assignment_ind_outlined,
   AppConstants.actionTaskCompleted => Icons.check_circle_outline_rounded,
   AppConstants.actionTaskStarted => Icons.play_circle_outline_rounded,
@@ -649,6 +653,7 @@ IconData _actionIcon(String type) => switch (type) {
 };
 
 Color _actionColor(String type) => switch (type) {
+  AppConstants.actionPollCreated => const Color(0xFFEC4899),
   AppConstants.actionTaskAssigned => const Color(0xFF06B6D4),
   AppConstants.actionTaskCompleted => AppColors.success,
   AppConstants.actionTaskStarted => const Color(0xFF3B82F6),
