@@ -74,13 +74,14 @@ class TasksRepository {
         .update({'status': status}).eq('id', taskId);
   }
 
-  // Comments
+  // Comments, chat-style: oldest first so the latest sits at the
+  // bottom next to the input (.order() defaults to DESCENDING).
   Future<List<TaskCommentModel>> getComments(String taskId) async {
     final response = await supabase
         .from(AppConstants.tableTaskComments)
         .select('*, profiles(id, full_name)')
         .eq('task_id', taskId)
-        .order('created_at');
+        .order('created_at', ascending: true);
     return (response as List)
         .map((e) => TaskCommentModel.fromJson(e as Map<String, dynamic>))
         .toList();
