@@ -24,6 +24,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+  // Set when signup succeeds but email confirmation is still required
+  // (no session yet) — switches the body to the "check your email" view.
+  String? _confirmEmailSentTo;
 
   @override
   void dispose() {
@@ -41,7 +44,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _errorMessage = null;
     });
     try {
-      await ref.read(authRepositoryProvider).signUp(
+      final response = await ref.read(authRepositoryProvider).signUp(
             email: _emailController.text.trim(),
             password: _passwordController.text,
             fullName: _nameController.text.trim(),
@@ -49,7 +52,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             intendedRole: _selectedRole,
           );
       if (mounted) {
-        if (_selectedRole == AppConstants.rolePresident) {
+        if (response.session == null) {
+          // Email confirmation required — no session until they verify.
+          setState(
+              () => _confirmEmailSentTo = _emailController.text.trim());
+        } else if (_selectedRole == AppConstants.rolePresident) {
           context.go('/club-setup');
         } else {
           context.go('/club-select');
@@ -68,6 +75,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_confirmEmailSentTo != null) {
+      return _buildConfirmEmailView(context);
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -242,6 +252,53 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfirmEmailView(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: [
+              const Spacer(),
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.mark_email_unread_rounded,
+                  color: AppColors.primary,
+                  size: 52,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Text('Confirm your email',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Text(
+                'We sent a confirmation link to\n$_confirmEmailSentTo\n\n'
+                'Tap the link in that email, then log in to finish '
+                'setting up your account.',
+                style: Theme.of(context).textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 40),
+              ElevatedButton(
+                onPressed: () => context.go('/login'),
+                child: const Text('Go to Log In'),
+              ),
+              const Spacer(),
+            ],
+          ),
         ),
       ),
     );
