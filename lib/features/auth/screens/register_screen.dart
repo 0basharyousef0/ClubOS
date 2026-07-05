@@ -20,6 +20,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _emailController = TextEditingController();
   final _personalEmailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _roleTitleController = TextEditingController();
   String _selectedRole = AppConstants.roleDirector;
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -34,7 +35,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _emailController.dispose();
     _personalEmailController.dispose();
     _passwordController.dispose();
+    _roleTitleController.dispose();
     super.dispose();
+  }
+
+  /// "Finance" -> "VP Finance"; leaves titles already starting with
+  /// "VP" (any case) untouched.
+  String _normalizedVpTitle() {
+    final raw = _roleTitleController.text.trim();
+    if (raw.isEmpty) return raw;
+    return RegExp(r'^vp\b', caseSensitive: false).hasMatch(raw)
+        ? raw
+        : 'VP $raw';
   }
 
   Future<void> _register() async {
@@ -50,6 +62,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             fullName: _nameController.text.trim(),
             personalEmail: _personalEmailController.text.trim(),
             intendedRole: _selectedRole,
+            roleTitle: _selectedRole == AppConstants.roleVicePresident
+                ? _normalizedVpTitle()
+                : null,
           );
       if (mounted) {
         if (response.session == null) {
@@ -200,6 +215,52 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         selected: _selectedRole,
                         onChanged: (r) => setState(() => _selectedRole = r),
                       ),
+                      if (_selectedRole ==
+                          AppConstants.roleVicePresident) ...[
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _roleTitleController,
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.done,
+                          decoration: const InputDecoration(
+                            labelText: 'Your VP Title',
+                            hintText: 'e.g. VP Finance, VP Events',
+                            helperText: 'Directors under you will be named '
+                                'after this (e.g. Finance Director)',
+                            helperMaxLines: 2,
+                            prefixIcon: Icon(Icons.badge_outlined),
+                          ),
+                          validator: (v) {
+                            if (_selectedRole !=
+                                AppConstants.roleVicePresident) {
+                              return null;
+                            }
+                            return v == null || v.trim().isEmpty
+                                ? 'Your VP title is required'
+                                : null;
+                          },
+                        ),
+                      ],
+                      if (_selectedRole == AppConstants.roleDirector) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline,
+                                size: 16, color: AppColors.textSecondary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'You\'ll pick which VP you work under when '
+                                'you choose your club — your title (e.g. '
+                                'Finance Director) is set automatically.',
+                                style:
+                                    Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 16),
                     ],
                   ),

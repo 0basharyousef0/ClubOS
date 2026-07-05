@@ -13,6 +13,12 @@ final _clubsProvider = FutureProvider<List<ClubModel>>((ref) async {
   return ref.watch(authRepositoryProvider).getClubs();
 });
 
+// Approved VPs of the selected club — directors pick who they work under.
+final _clubVpsProvider = FutureProvider.family<List<Map<String, dynamic>>,
+    String>((ref, clubId) async {
+  return ref.watch(authRepositoryProvider).getClubVps(clubId);
+});
+
 class ClubSelectScreen extends ConsumerStatefulWidget {
   const ClubSelectScreen({super.key});
 
@@ -22,9 +28,21 @@ class ClubSelectScreen extends ConsumerStatefulWidget {
 
 class _ClubSelectScreenState extends ConsumerState<ClubSelectScreen> {
   ClubModel? _selectedClub;
+  Map<String, dynamic>? _selectedVp;
   final _roleTitleController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    // VPs typed their title at signup — prefill it here (still editable).
+    final meta = supabase.auth.currentUser?.userMetadata;
+    if ((meta?['intended_role'] as String?) ==
+        AppConstants.roleVicePresident) {
+      _roleTitleController.text = (meta?['role_title'] as String?) ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -32,17 +50,46 @@ class _ClubSelectScreenState extends ConsumerState<ClubSelectScreen> {
     super.dispose();
   }
 
+  /// "VP Finance" / "VP of Finance" / "Vice President Finance" -> "Finance
+  /// Director". Falls back to plain "Director" if the VP has no title.
+  static String directorTitleFor(Map<String, dynamic> vp) {
+    final title = ((vp['role_title'] as String?) ?? '').trim();
+    if (title.isEmpty) return 'Director';
+    final base = title
+        .replaceFirst(
+            RegExp(r'^vice\s+president\s+(of\s+)?', caseSensitive: false), '')
+        .replaceFirst(RegExp(r'^vp\s+(of\s+)?', caseSensitive: false), '')
+        .trim();
+    return base.isEmpty ? 'Director' : '$base Director';
+  }
+
   Future<void> _joinClub() async {
     if (_selectedClub == null) return;
 
     final role = supabase.auth.currentUser?.userMetadata?['intended_role'] as String?
         ?? AppConstants.roleVicePresident;
-    final isPresidentRole = role == AppConstants.rolePresident;
-    final roleTitle = _roleTitleController.text.trim();
 
-    if (!isPresidentRole && roleTitle.isEmpty) {
-      setState(() => _errorMessage = 'Please enter your specific role title.');
-      return;
+    String? roleTitle;
+    if (role == AppConstants.roleVicePresident) {
+      final raw = _roleTitleController.text.trim();
+      if (raw.isEmpty) {
+        setState(() =>
+            _errorMessage = 'Please enter your VP title (e.g. VP Finance).');
+        return;
+      }
+      roleTitle = RegExp(r'^vp\b', caseSensitive: false).hasMatch(raw)
+          ? raw
+          : 'VP $raw';
+    } else if (role == AppConstants.roleDirector) {
+      final vps =
+          ref.read(_clubVpsProvider(_selectedClub!.id)).valueOrNull ?? [];
+      if (vps.isNotEmpty && _selectedVp == null) {
+        setState(() =>
+            _errorMessage = 'Please select the VP you work under.');
+        return;
+      }
+      // A club with no VPs yet: join with the general Director title.
+      roleTitle = _selectedVp == null ? null : directorTitleFor(_selectedVp!);
     }
 
     setState(() {
@@ -53,7 +100,7 @@ class _ClubSelectScreenState extends ConsumerState<ClubSelectScreen> {
       await ref.read(authRepositoryProvider).joinClub(
             clubId: _selectedClub!.id,
             role: role,
-            roleTitle: isPresidentRole ? null : roleTitle,
+            roleTitle: roleTitle,
           );
       ref.invalidate(userClubRolesProvider);
       if (mounted) context.go('/pending-approval');
@@ -71,7 +118,6 @@ class _ClubSelectScreenState extends ConsumerState<ClubSelectScreen> {
     final clubsAsync = ref.watch(_clubsProvider);
     final role = supabase.auth.currentUser?.userMetadata?['intended_role'] as String?
         ?? AppConstants.roleVicePresident;
-    final needsTitle = role != AppConstants.rolePresident;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -141,26 +187,39 @@ class _ClubSelectScreenState extends ConsumerState<ClubSelectScreen> {
                             selected: _selectedClub,
                             onSelect: (c) => setState(() {
                               _selectedClub = c;
-                              _roleTitleController.clear();
+                              _selectedVp = null;
                             }),
                           );
                   },
                 ),
               ),
-              if (needsTitle && _selectedClub != null) ...[
+              if (_selectedClub != null &&
+                  role == AppConstants.roleVicePresident) ...[
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _roleTitleController,
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.done,
                   onChanged: (_) => setState(() => _errorMessage = null),
-                  decoration: InputDecoration(
-                    labelText: 'Your Specific Role',
-                    hintText: role == AppConstants.roleVicePresident
-                        ? 'e.g. VP Finance, VP Marketing'
-                        : 'e.g. Director of Events, Director of Finance',
-                    prefixIcon: const Icon(Icons.badge_outlined),
+                  decoration: const InputDecoration(
+                    labelText: 'Your VP Title',
+                    hintText: 'e.g. VP Finance, VP Marketing',
+                    prefixIcon: Icon(Icons.badge_outlined),
                   ),
+                ),
+              ],
+              if (_selectedClub != null &&
+                  role == AppConstants.roleDirector) ...[
+                const SizedBox(height: 16),
+                _VpPicker(
+                  vpsAsync: ref.watch(_clubVpsProvider(_selectedClub!.id)),
+                  selected: _selectedVp,
+                  onSelect: (vp) => setState(() {
+                    _selectedVp = vp;
+                    _errorMessage = null;
+                  }),
+                  onRetry: () =>
+                      ref.invalidate(_clubVpsProvider(_selectedClub!.id)),
                 ),
               ],
               if (_errorMessage != null) ...[
@@ -211,6 +270,119 @@ class _ClubSelectScreenState extends ConsumerState<ClubSelectScreen> {
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       ],
+    );
+  }
+}
+
+class _VpPicker extends StatelessWidget {
+  final AsyncValue<List<Map<String, dynamic>>> vpsAsync;
+  final Map<String, dynamic>? selected;
+  final ValueChanged<Map<String, dynamic>> onSelect;
+  final VoidCallback onRetry;
+
+  const _VpPicker({
+    required this.vpsAsync,
+    required this.selected,
+    required this.onSelect,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return vpsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      error: (e, _) => Row(
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text('Couldn\'t load this club\'s VPs',
+                style: TextStyle(fontSize: 13, color: AppColors.error)),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
+      data: (vps) {
+        if (vps.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline,
+                    color: AppColors.primary, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'This club has no VPs yet — you\'ll join with the '
+                    'general Director title.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: selected?['user_id'] as String?,
+              decoration: const InputDecoration(
+                labelText: 'VP you work under',
+                prefixIcon: Icon(Icons.supervisor_account_outlined),
+              ),
+              items: [
+                for (final vp in vps)
+                  DropdownMenuItem(
+                    value: vp['user_id'] as String,
+                    child: Text(
+                      (vp['role_title'] as String?)?.trim().isNotEmpty == true
+                          ? '${vp['full_name']} · ${vp['role_title']}'
+                          : vp['full_name'] as String,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (id) {
+                final vp = vps.firstWhere((v) => v['user_id'] == id);
+                onSelect(vp);
+              },
+            ),
+            if (selected != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.badge_outlined,
+                      color: AppColors.primary, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Your title: '
+                    '${_ClubSelectScreenState.directorTitleFor(selected!)}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

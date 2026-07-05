@@ -32,6 +32,7 @@ class AuthRepository {
     required String fullName,
     required String personalEmail,
     required String intendedRole,
+    String? roleTitle,
   }) async {
     return supabase.auth.signUp(
       email: email,
@@ -40,8 +41,19 @@ class AuthRepository {
         'full_name': fullName,
         'personal_email': personalEmail,
         'intended_role': intendedRole,
+        if (roleTitle != null && roleTitle.trim().isNotEmpty)
+          'role_title': roleTitle.trim(),
       },
     );
+  }
+
+  /// Approved VPs of a club (name + title), for the director join flow.
+  /// Uses a SECURITY DEFINER RPC because the joining user is not a member
+  /// yet, so RLS hides other members' roles.
+  Future<List<Map<String, dynamic>>> getClubVps(String clubId) async {
+    final response =
+        await supabase.rpc('list_club_vps', params: {'p_club_id': clubId});
+    return (response as List).cast<Map<String, dynamic>>();
   }
 
   Future<void> signIn({required String email, required String password}) async {
