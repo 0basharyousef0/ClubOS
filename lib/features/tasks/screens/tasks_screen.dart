@@ -19,6 +19,8 @@ class TasksScreen extends ConsumerStatefulWidget {
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
   String _filter = 'all';
+  // VP-only view switch: their own tasks vs tasks they handed out.
+  bool _showAssignedByMe = false;
 
   List<TaskModel> _applyFilter(List<TaskModel> tasks) {
     if (_filter == 'all') return tasks;
@@ -29,12 +31,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   Widget build(BuildContext context) {
     final role = ref.watch(activeClubRoleProvider);
     final canAssign = role?.canAssignTasks ?? false;
-    // Only the president tracks handed-out tasks here; VPs and directors
-    // see just the tasks assigned TO them (president oversees via the
-    // activity log).
+    // Presidents only hand out tasks, so they get just the assigned-by-me
+    // view. VPs receive AND hand out, so they can toggle between their
+    // own tasks and the ones they assigned (never other VPs' tasks —
+    // the query and RLS both scope to assigned_by = them).
     final isPresident = role?.isPresident ?? false;
+    final isVp = role?.isVicePresident ?? false;
+    final showingAssigned = isPresident || (isVp && _showAssignedByMe);
 
-    final tasksAsync = isPresident
+    final tasksAsync = showingAssigned
         ? ref.watch(assignedByMeTasksProvider)
         : ref.watch(myAssignedTasksProvider);
 
@@ -46,7 +51,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           color: AppColors.primary,
           edgeOffset: 100,
           onRefresh: () async {
-            if (isPresident) {
+            if (showingAssigned) {
               ref.invalidate(assignedByMeTasksProvider);
             } else {
               ref.invalidate(myAssignedTasksProvider);
@@ -57,12 +62,19 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             children: [
               TabHeaderHero(
                 child: _TasksHeader(
-                  isPresident: isPresident,
+                  isPresident: showingAssigned,
                   clubName: role?.club?.name,
                   tasksAsync: tasksAsync,
                 ),
               ),
               const SizedBox(height: 16),
+              if (isVp) ...[
+                _VpViewToggle(
+                  showAssignedByMe: _showAssignedByMe,
+                  onChanged: (v) => setState(() => _showAssignedByMe = v),
+                ),
+                const SizedBox(height: 14),
+              ],
               // Filter chips
               _FilterRow(
                 selected: _filter,
@@ -91,7 +103,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       message: _filter == 'all'
                           ? 'No tasks yet.'
                           : 'No ${_filterLabel(_filter).toLowerCase()} tasks.',
-                      sub: isPresident
+                      sub: showingAssigned
                           ? 'Tap + to assign a task to a member.'
                           : 'Tasks assigned to you will appear here.',
                     );
@@ -102,7 +114,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       children: [
                         ...filtered.map((t) => _TaskCard(
                               task: t,
-                              showAssignee: isPresident,
+                              showAssignee: showingAssigned,
                               onTap: () => context.go('/tasks/${t.id}'),
                             )),
                         const SizedBox(height: 32),
@@ -222,6 +234,65 @@ class _TasksHeader extends StatelessWidget {
 }
 
 // ── Filter chips ──────────────────────────────────────────────
+
+// ── VP view toggle ────────────────────────────────────────────
+
+class _VpViewToggle extends StatelessWidget {
+  final bool showAssignedByMe;
+  final ValueChanged<bool> onChanged;
+
+  const _VpViewToggle({
+    required this.showAssignedByMe,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            _segment('My Tasks', !showAssignedByMe, () => onChanged(false)),
+            _segment('Assigned by Me', showAssignedByMe,
+                () => onChanged(true)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _segment(String label, bool selected, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _FilterRow extends StatelessWidget {
   final String selected;
