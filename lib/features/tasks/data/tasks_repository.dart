@@ -8,12 +8,14 @@ import '../../../shared/models/task_model.dart';
 import '../../../shared/models/user_club_role_model.dart';
 
 class TasksRepository {
-  // All tasks for a club — President/VP view
-  Future<List<TaskModel>> getClubTasks(String clubId) async {
+  // Tasks a user handed out (with assignee) — President oversight view
+  Future<List<TaskModel>> getTasksAssignedBy(
+      String clubId, String userId) async {
     final response = await supabase
         .from(AppConstants.tableTasks)
         .select('*, profiles!assigned_to(id, full_name, email)')
         .eq('club_id', clubId)
+        .eq('assigned_by', userId)
         .order('created_at', ascending: false);
     return (response as List)
         .map((e) => TaskModel.fromJson(e as Map<String, dynamic>))

@@ -53,6 +53,7 @@ class AppConstants {
   static const String notifJoinRequest = 'join_request';
 
   // Activity log action types
+  static const String actionTaskAssigned = 'task_assigned';
   static const String actionTaskCompleted = 'task_completed';
   static const String actionTaskStarted = 'task_started';
   static const String actionEventRsvp = 'event_rsvp';

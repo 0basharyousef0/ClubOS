@@ -56,7 +56,7 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
             dueDate: _dueDate,
             urgency: _urgency,
           );
-      ref.invalidate(clubTasksProvider);
+      ref.invalidate(assignedByMeTasksProvider);
       if (mounted) context.pop();
     } catch (e) {
       if (mounted) setState(() => _error = 'Failed to create task. Try again.');

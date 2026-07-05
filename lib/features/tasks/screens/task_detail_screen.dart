@@ -153,7 +153,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     if (confirmed != true) return;
     try {
       await ref.read(tasksRepositoryProvider).deleteTask(task.id);
-      ref.invalidate(clubTasksProvider);
+      ref.invalidate(assignedByMeTasksProvider);
       ref.invalidate(myAssignedTasksProvider);
       ref.invalidate(myTasksProvider);
       if (mounted) context.pop();
@@ -173,7 +173,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           .read(tasksRepositoryProvider)
           .updateStatus(widget.taskId, newStatus);
       ref.invalidate(taskDetailProvider(widget.taskId));
-      ref.invalidate(clubTasksProvider);
+      ref.invalidate(assignedByMeTasksProvider);
       ref.invalidate(myAssignedTasksProvider);
     } catch (_) {
       if (mounted) {

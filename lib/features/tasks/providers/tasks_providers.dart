@@ -9,14 +9,17 @@ import '../data/tasks_repository.dart';
 final tasksRepositoryProvider =
     Provider<TasksRepository>((ref) => TasksRepository());
 
-// All tasks for the club (President/VP)
-final clubTasksProvider = FutureProvider<List<TaskModel>>((ref) async {
+// Tasks the current user assigned to others (President oversight view)
+final assignedByMeTasksProvider =
+    FutureProvider<List<TaskModel>>((ref) async {
   final role = ref.watch(activeClubRoleProvider);
   if (role == null) return [];
-  return ref.read(tasksRepositoryProvider).getClubTasks(role.clubId);
+  return ref
+      .read(tasksRepositoryProvider)
+      .getTasksAssignedBy(role.clubId, role.userId);
 });
 
-// Tasks assigned to the current user (Director view)
+// Tasks assigned to the current user (everyone's own list)
 final myAssignedTasksProvider = FutureProvider<List<TaskModel>>((ref) async {
   final role = ref.watch(activeClubRoleProvider);
   if (role == null) return [];

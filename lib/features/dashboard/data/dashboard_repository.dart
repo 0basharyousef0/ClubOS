@@ -34,13 +34,15 @@ class DashboardRepository {
         .toList();
   }
 
-  /// President dashboard: the club's most recently created tasks
+  /// President dashboard: tasks they most recently handed out
   /// (any status) with each assignee's profile joined.
-  Future<List<TaskModel>> getClubTasks(String clubId) async {
+  Future<List<TaskModel>> getTasksAssignedBy(
+      String clubId, String userId) async {
     final response = await supabase
         .from(AppConstants.tableTasks)
         .select('*, profiles!assigned_to(id, full_name, email)')
         .eq('club_id', clubId)
+        .eq('assigned_by', userId)
         .order('created_at', ascending: false)
         .limit(6);
     return (response as List)

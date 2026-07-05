@@ -24,8 +24,10 @@ final myTasksProvider = FutureProvider<List<TaskModel>>((ref) async {
   if (role == null) return [];
   final repo = ref.read(dashboardRepositoryProvider);
   // Presidents oversee rather than receive tasks, so their dashboard
-  // lists the club's assigned tasks (with assignee) instead.
-  if (role.isPresident) return repo.getClubTasks(role.clubId);
+  // lists the tasks they handed out (with assignee) instead.
+  if (role.isPresident) {
+    return repo.getTasksAssignedBy(role.clubId, role.userId);
+  }
   return repo.getMyTasks(role.clubId, role.userId);
 });
 

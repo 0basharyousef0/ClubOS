@@ -29,9 +29,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   Widget build(BuildContext context) {
     final role = ref.watch(activeClubRoleProvider);
     final canAssign = role?.canAssignTasks ?? false;
+    // Only the president tracks handed-out tasks here; VPs and directors
+    // see just the tasks assigned TO them (president oversees via the
+    // activity log).
+    final isPresident = role?.isPresident ?? false;
 
-    final tasksAsync = canAssign
-        ? ref.watch(clubTasksProvider)
+    final tasksAsync = isPresident
+        ? ref.watch(assignedByMeTasksProvider)
         : ref.watch(myAssignedTasksProvider);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -42,8 +46,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           color: AppColors.primary,
           edgeOffset: 100,
           onRefresh: () async {
-            if (canAssign) {
-              ref.invalidate(clubTasksProvider);
+            if (isPresident) {
+              ref.invalidate(assignedByMeTasksProvider);
             } else {
               ref.invalidate(myAssignedTasksProvider);
             }
@@ -53,7 +57,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             children: [
               TabHeaderHero(
                 child: _TasksHeader(
-                  canAssign: canAssign,
+                  isPresident: isPresident,
                   clubName: role?.club?.name,
                   tasksAsync: tasksAsync,
                 ),
@@ -87,7 +91,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       message: _filter == 'all'
                           ? 'No tasks yet.'
                           : 'No ${_filterLabel(_filter).toLowerCase()} tasks.',
-                      sub: canAssign
+                      sub: isPresident
                           ? 'Tap + to assign a task to a member.'
                           : 'Tasks assigned to you will appear here.',
                     );
@@ -98,7 +102,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       children: [
                         ...filtered.map((t) => _TaskCard(
                               task: t,
-                              showAssignee: canAssign,
+                              showAssignee: isPresident,
                               onTap: () => context.go('/tasks/${t.id}'),
                             )),
                         const SizedBox(height: 32),
@@ -135,12 +139,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 // ── Header ────────────────────────────────────────────────────
 
 class _TasksHeader extends StatelessWidget {
-  final bool canAssign;
+  final bool isPresident;
   final String? clubName;
   final AsyncValue tasksAsync;
 
   const _TasksHeader({
-    required this.canAssign,
+    required this.isPresident,
     required this.clubName,
     required this.tasksAsync,
   });
@@ -197,8 +201,8 @@ class _TasksHeader extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         count != null
-                            ? '$count ${canAssign ? 'club task${count == 1 ? '' : 's'}' : 'assigned task${count == 1 ? '' : 's'}'}'
-                            : canAssign ? 'All club tasks' : 'My tasks',
+                            ? '$count ${isPresident ? 'task${count == 1 ? '' : 's'} assigned' : 'assigned task${count == 1 ? '' : 's'}'}'
+                            : isPresident ? 'Tasks you assigned' : 'My tasks',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,

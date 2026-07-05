@@ -318,8 +318,15 @@ class _ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _actionColor(entry.actionType);
-    final subject = entry.subjectTitle;
     final sentence = _actionSentence(entry.actionType);
+    // Assignments also carry who received the task.
+    var subject = entry.subjectTitle;
+    final assignee = entry.details?['assignee_name'] as String?;
+    if (entry.actionType == AppConstants.actionTaskAssigned &&
+        subject != null &&
+        assignee != null) {
+      subject = '$subject → $assignee';
+    }
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -603,6 +610,7 @@ void _showMemberPicker(
 // ── Action-type display helpers ─────────────────────────────────
 
 const _actionTypes = <String>[
+  AppConstants.actionTaskAssigned,
   AppConstants.actionTaskCompleted,
   AppConstants.actionTaskStarted,
   AppConstants.actionEventRsvp,
@@ -611,6 +619,7 @@ const _actionTypes = <String>[
 ];
 
 String _actionLabel(String type) => switch (type) {
+  AppConstants.actionTaskAssigned => 'Assigned',
   AppConstants.actionTaskCompleted => 'Completed',
   AppConstants.actionTaskStarted => 'Started',
   AppConstants.actionEventRsvp => 'RSVPs',
@@ -620,6 +629,7 @@ String _actionLabel(String type) => switch (type) {
 };
 
 String _actionSentence(String type) => switch (type) {
+  AppConstants.actionTaskAssigned => 'Assigned a task',
   AppConstants.actionTaskCompleted => 'Completed a task',
   AppConstants.actionTaskStarted => 'Started a task',
   AppConstants.actionEventRsvp => 'RSVP’d to an event',
@@ -629,6 +639,7 @@ String _actionSentence(String type) => switch (type) {
 };
 
 IconData _actionIcon(String type) => switch (type) {
+  AppConstants.actionTaskAssigned => Icons.assignment_ind_outlined,
   AppConstants.actionTaskCompleted => Icons.check_circle_outline_rounded,
   AppConstants.actionTaskStarted => Icons.play_circle_outline_rounded,
   AppConstants.actionEventRsvp => Icons.event_available_outlined,
@@ -638,6 +649,7 @@ IconData _actionIcon(String type) => switch (type) {
 };
 
 Color _actionColor(String type) => switch (type) {
+  AppConstants.actionTaskAssigned => const Color(0xFF06B6D4),
   AppConstants.actionTaskCompleted => AppColors.success,
   AppConstants.actionTaskStarted => const Color(0xFF3B82F6),
   AppConstants.actionEventRsvp => AppColors.primary,
