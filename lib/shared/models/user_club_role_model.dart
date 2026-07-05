@@ -9,6 +9,8 @@ class UserClubRoleModel {
   final String? roleTitle;
   final String status;
   final String? approvedBy;
+  // Directors: the VP they work under.
+  final String? reportsTo;
   final DateTime createdAt;
   final ClubModel? club;
   final ProfileModel? profile;
@@ -21,6 +23,7 @@ class UserClubRoleModel {
     this.roleTitle,
     required this.status,
     this.approvedBy,
+    this.reportsTo,
     required this.createdAt,
     this.club,
     this.profile,
@@ -57,6 +60,7 @@ class UserClubRoleModel {
         roleTitle: json['role_title'] as String?,
         status: json['status'] as String,
         approvedBy: json['approved_by'] as String?,
+        reportsTo: json['reports_to'] as String?,
         createdAt: DateTime.parse(json['created_at'] as String),
         club: json['clubs'] != null
             ? ClubModel.fromJson(json['clubs'] as Map<String, dynamic>)

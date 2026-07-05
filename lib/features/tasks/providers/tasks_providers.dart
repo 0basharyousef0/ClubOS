@@ -48,7 +48,8 @@ final taskAttachmentsProvider =
 });
 
 // Approved club members for the assignment picker, limited to the
-// tier below the assigner: presidents assign to VPs, VPs to directors.
+// tier below the assigner: presidents assign to VPs, VPs to their
+// OWN directors (reports_to link captured at signup).
 final clubMembersProvider =
     FutureProvider<List<UserClubRoleModel>>((ref) async {
   final role = ref.watch(activeClubRoleProvider);
@@ -59,7 +60,9 @@ final clubMembersProvider =
     return members.where((m) => m.isVicePresident).toList();
   }
   if (role.isVicePresident) {
-    return members.where((m) => m.isDirector).toList();
+    return members
+        .where((m) => m.isDirector && m.reportsTo == role.userId)
+        .toList();
   }
   return [];
 });
