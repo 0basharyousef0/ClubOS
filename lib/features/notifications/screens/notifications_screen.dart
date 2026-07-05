@@ -35,12 +35,40 @@ class NotificationsScreen extends ConsumerWidget {
                 ),
               ),
               trailing: unread > 0
-                  ? TextButton(
-                      onPressed: () => _markAll(ref),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
+                  ? Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => _markAll(ref),
+                        // Pill styled to match GradientHeaderBadge so it
+                        // reads as a button on the gradient header
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.25)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.done_all_rounded,
+                                  color: Colors.white, size: 14),
+                              SizedBox(width: 6),
+                              Text(
+                                'Mark all read',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: const Text('Mark all read'),
                     )
                   : null,
             ),
