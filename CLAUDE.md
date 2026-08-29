@@ -437,3 +437,11 @@ Work through these phases in order. Do not start a new phase until the current o
 - [ ] Multi-club switcher (if user is in more than one club)
 
 ---
+
+### iOS / App Store configuration
+- `Info.plist`: `CFBundleDisplayName = ClubOS`, `ITSAppUsesNonExemptEncryption = false` (skips the export-compliance prompt on every upload), `UIBackgroundModes = [remote-notification]`. The `io.clubos` URL scheme was **removed** — it existed only for the password-reset deep link, which the OTP conversion retired
+- `Runner/Runner.entitlements` carries `aps-environment` (Xcode promotes it to `production` at distribution) and is wired via `CODE_SIGN_ENTITLEMENTS` in **all three** Runner target configs (Debug, Release *and* Profile). Without it push cannot work on a real device
+- `Runner/PrivacyInfo.xcprivacy` declares the collected data types (email, name, user id, user content — all linked to identity, none used for tracking) and the `UserDefaults` required-reason API (`CA92.1`). It ships as a bundle resource
+- `TARGETED_DEVICE_FAMILY = 1` — iPhone-only for v1, so review and screenshots skip iPad
+- Launch images are generated from `assets/images/logo.png` at 68/136/204 px. The storyboard image view uses `contentMode="center"`, so the image renders at natural size — those three sizes are exactly 1x/2x/3x of 68pt and never upscale
+- **Note:** `CODE_SIGNING_ALLOWED/REQUIRED = NO` appear only in the **Debug** configs (project-level and target-level). Release and Profile are clean, so archiving signs normally. `DEVELOPMENT_TEAM` is still unset pending Apple Developer enrollment
