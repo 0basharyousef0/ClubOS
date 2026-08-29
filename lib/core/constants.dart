@@ -17,6 +17,18 @@ class AppConstants {
   static const String tableNotifications = 'notifications';
   static const String tableFcmTokens = 'fcm_tokens';
 
+  // Public legal + support surfaces. Required by App Store review:
+  // guideline 5.1.1 (privacy policy) and 1.2 (terms with content rules
+  // and a contact for reporting). Served from /docs via GitHub Pages.
+  static const String urlPrivacyPolicy =
+      'https://0basharyousef0.github.io/ClubOS/privacy-policy.html';
+  static const String urlTermsOfService =
+      'https://0basharyousef0.github.io/ClubOS/terms-of-service.html';
+  static const String urlSupport = 'https://0basharyousef0.github.io/ClubOS/';
+
+  /// Shown publicly in-app and on the App Store listing.
+  static const String supportEmail = 'basharkyousef2@gmail.com';
+
   // Roles
   static const String rolePresident = 'president';
   static const String roleVicePresident = 'vice_president';

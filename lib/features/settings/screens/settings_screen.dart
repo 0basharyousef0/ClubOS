@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/widgets/legal_links.dart';
 import '../../../shared/widgets/verification_code_view.dart';
+import '../../../core/constants.dart';
 import '../../../core/supabase_client.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../../../features/directory/providers/directory_providers.dart';
@@ -174,6 +176,59 @@ class SettingsScreen extends ConsumerWidget {
             ),
 
             const SizedBox(height: 24),
+            const _SectionLabel(label: 'About'),
+            const SizedBox(height: 8),
+
+            _SettingsTile(
+              icon: Icons.shield_outlined,
+              title: 'Privacy Policy',
+              subtitle: 'What we collect and how to delete your data',
+              onTap: () => _openUrl(context, AppConstants.urlPrivacyPolicy),
+            ),
+            const SizedBox(height: 8),
+            _SettingsTile(
+              icon: Icons.description_outlined,
+              title: 'Terms of Service',
+              subtitle: 'Community rules and acceptable use',
+              onTap: () => _openUrl(context, AppConstants.urlTermsOfService),
+            ),
+            const SizedBox(height: 8),
+            _SettingsTile(
+              icon: Icons.support_agent_rounded,
+              title: 'Contact Support',
+              subtitle: AppConstants.supportEmail,
+              onTap: () async {
+                final ok = await openSupportEmail();
+                if (!ok && context.mounted) {
+                  _showCopyableFallback(
+                    context,
+                    'No mail app is set up. Email us at '
+                    '${AppConstants.supportEmail}',
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            _SettingsTile(
+              icon: Icons.balance_rounded,
+              title: 'Open Source Licenses',
+              subtitle: 'Software ClubOS is built on',
+              onTap: () => showLicensePage(
+                context: context,
+                applicationName: 'ClubOS',
+                applicationVersion: _appVersion,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                'ClubOS $_appVersion',
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ),
+
+            const SizedBox(height: 24),
             const _SectionLabel(label: 'Danger Zone'),
             const SizedBox(height: 8),
             if (isPresident) ...[
@@ -304,6 +359,31 @@ class SettingsScreen extends ConsumerWidget {
           ref.read(selectedClubRoleProvider.notifier).state = null;
           ref.invalidate(userClubRolesProvider);
         },
+      ),
+    );
+  }
+
+  /// Kept in step with `version:` in pubspec.yaml. Hardcoded rather than
+  /// read via package_info_plus — one string is not worth another
+  /// platform plugin in the iOS build.
+  static const String _appVersion = '1.0.0';
+
+  Future<void> _openUrl(BuildContext context, String url) async {
+    final ok = await openExternalUrl(url);
+    if (!ok && context.mounted) {
+      _showCopyableFallback(context, 'Could not open the page. Visit $url');
+    }
+  }
+
+  /// A launch can fail on a device with no browser or mail client set up;
+  /// show the address rather than silently doing nothing.
+  void _showCopyableFallback(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }

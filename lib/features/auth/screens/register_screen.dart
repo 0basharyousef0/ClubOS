@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/widgets/legal_links.dart';
 import '../../../shared/widgets/verification_code_view.dart';
 import '../../../core/constants.dart';
 import '../providers/auth_providers.dart';
@@ -291,6 +292,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           )
                         : const Text('Create Account'),
                   ),
+                  const SizedBox(height: 10),
+                  // App Store guideline 1.2: an app with user-generated
+                  // content must surface its content rules before signup.
+                  const LegalConsentLine(),
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
