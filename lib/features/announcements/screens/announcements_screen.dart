@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/constants.dart';
+import '../../../shared/widgets/report_content_sheet.dart';
 import '../../../shared/widgets/tab_header_hero.dart';
 import '../../../core/supabase_client.dart';
 import '../../../features/auth/providers/auth_providers.dart';
@@ -301,7 +303,19 @@ class _AnnouncementCard extends ConsumerWidget {
     final currentUserId = supabase.auth.currentUser?.id;
     final isOwner = currentUserId != null && currentUserId == item.postedBy;
 
-    return Container(
+    return GestureDetector(
+      // Long-press to report (App Store guideline 1.2). Reporting your
+      // own post would be noise, so it is offered on other people's.
+      onLongPress: isOwner
+          ? null
+          : () => showReportContentSheet(
+                context,
+                ref,
+                contentType: AppConstants.reportAnnouncement,
+                contentId: item.id,
+                excerpt: '${item.title}. ${item.content}',
+              ),
+      child: Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
@@ -426,6 +440,7 @@ class _AnnouncementCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

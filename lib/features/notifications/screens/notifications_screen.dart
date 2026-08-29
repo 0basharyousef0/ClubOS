@@ -141,6 +141,7 @@ IconData _typeIcon(String type) => switch (type) {
   AppConstants.notifMeetingReminder => Icons.alarm_rounded,
   AppConstants.notifMeetingCancelled => Icons.event_busy_outlined,
   AppConstants.notifTermStarted => Icons.auto_awesome_rounded,
+  AppConstants.notifContentReported => Icons.flag_rounded,
   _ => Icons.notifications_outlined,
 };
 
@@ -157,6 +158,7 @@ Color _typeColor(String type) => switch (type) {
   AppConstants.notifMeetingReminder => const Color(0xFF0EA5E9),
   AppConstants.notifMeetingCancelled => AppColors.error,
   AppConstants.notifTermStarted => const Color(0xFF8B5CF6),
+  AppConstants.notifContentReported => AppColors.error,
   _ => AppColors.textSecondary,
 };
 
@@ -173,6 +175,9 @@ String? _routeForType(String type) => switch (type) {
   AppConstants.notifMeetingScheduled => '/meetings',
   AppConstants.notifMeetingReminder => '/meetings',
   AppConstants.notifMeetingCancelled => '/meetings',
+  // Only presidents receive these, and the activity log is where they
+  // review reports alongside everything else that happened.
+  AppConstants.notifContentReported => '/activity-log',
   _ => null,
 };
 

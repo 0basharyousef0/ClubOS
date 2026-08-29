@@ -11,6 +11,7 @@ class AppConstants {
   static const String tablePolls = 'polls';
   static const String tablePollOptions = 'poll_options';
   static const String tablePollVotes = 'poll_votes';
+  static const String tableContentReports = 'content_reports';
   static const String tableMeetings = 'meetings';
   static const String tableMeetingAttendees = 'meeting_attendees';
   static const String tableActivityLog = 'activity_log';
@@ -61,6 +62,10 @@ class AppConstants {
   static const String audienceMyDirectors = 'my_directors';
   static const String audienceCustom = 'custom';
 
+  // Reportable content types (App Store guideline 1.2)
+  static const String reportAnnouncement = 'announcement';
+  static const String reportTaskComment = 'task_comment';
+
   // Meeting audience
   static const String meetingAudienceVps = 'vps';
   static const String meetingAudienceVpsDirectors = 'vps_directors';
@@ -87,6 +92,7 @@ class AppConstants {
   static const String notifMeetingReminder = 'meeting_reminder';
   static const String notifMeetingCancelled = 'meeting_cancelled';
   static const String notifTermStarted = 'term_started';
+  static const String notifContentReported = 'content_reported';
 
   // Activity log action types
   static const String actionPollCreated = 'poll_created';
@@ -100,4 +106,5 @@ class AppConstants {
   static const String actionPresidencyTransferred = 'presidency_transferred';
   static const String actionMeetingScheduled = 'meeting_scheduled';
   static const String actionTermStarted = 'term_started';
+  static const String actionContentReported = 'content_reported';
 }

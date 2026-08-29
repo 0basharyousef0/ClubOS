@@ -32,6 +32,7 @@ const TITLES: Record<string, string> = {
   meeting_reminder: "Meeting reminder",
   meeting_cancelled: "Meeting cancelled",
   term_started: "New term started",
+  content_reported: "Content reported",
 };
 
 function base64url(input: ArrayBuffer | string): string {

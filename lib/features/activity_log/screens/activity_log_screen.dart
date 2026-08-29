@@ -625,6 +625,9 @@ const _actionTypes = <String>[
   AppConstants.actionPollVote,
   AppConstants.actionMemberLeft,
   AppConstants.actionPresidencyTransferred,
+  AppConstants.actionMeetingScheduled,
+  AppConstants.actionContentReported,
+  AppConstants.actionTermStarted,
 ];
 
 String _actionLabel(String type) => switch (type) {
@@ -637,6 +640,9 @@ String _actionLabel(String type) => switch (type) {
   AppConstants.actionPollVote => 'Votes',
   AppConstants.actionMemberLeft => 'Departures',
   AppConstants.actionPresidencyTransferred => 'Transfers',
+  AppConstants.actionMeetingScheduled => 'Meetings',
+  AppConstants.actionContentReported => 'Reports',
+  AppConstants.actionTermStarted => 'New Term',
   _ => 'Other',
 };
 
@@ -650,6 +656,9 @@ String _actionSentence(String type) => switch (type) {
   AppConstants.actionPollVote => 'Voted in a poll',
   AppConstants.actionMemberLeft => 'Deleted their account and left the club',
   AppConstants.actionPresidencyTransferred => 'Transferred the presidency',
+  AppConstants.actionMeetingScheduled => 'Scheduled a meeting',
+  AppConstants.actionContentReported => 'Reported content for review',
+  AppConstants.actionTermStarted => 'Started a new term',
   _ => 'Recorded an action',
 };
 
@@ -663,6 +672,9 @@ IconData _actionIcon(String type) => switch (type) {
   AppConstants.actionPollVote => Icons.how_to_vote_outlined,
   AppConstants.actionMemberLeft => Icons.person_off_outlined,
   AppConstants.actionPresidencyTransferred => Icons.workspace_premium_outlined,
+  AppConstants.actionMeetingScheduled => Icons.groups_outlined,
+  AppConstants.actionContentReported => Icons.flag_outlined,
+  AppConstants.actionTermStarted => Icons.auto_awesome_rounded,
   _ => Icons.history_rounded,
 };
 
@@ -676,6 +688,9 @@ Color _actionColor(String type) => switch (type) {
   AppConstants.actionPollVote => const Color(0xFF8B5CF6),
   AppConstants.actionMemberLeft => AppColors.error,
   AppConstants.actionPresidencyTransferred => const Color(0xFFEC4899),
+  AppConstants.actionMeetingScheduled => const Color(0xFF0EA5E9),
+  AppConstants.actionContentReported => AppColors.error,
+  AppConstants.actionTermStarted => const Color(0xFF8B5CF6),
   _ => AppColors.textSecondary,
 };
 

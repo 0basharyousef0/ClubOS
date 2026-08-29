@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/widgets/report_content_sheet.dart';
 import '../../../core/constants.dart';
 import '../../../core/supabase_client.dart';
 import '../../../features/dashboard/providers/dashboard_providers.dart';
@@ -732,17 +733,29 @@ class _SectionCard extends StatelessWidget {
 
 // ── Comment bubble ────────────────────────────────────────────
 
-class _CommentBubble extends StatelessWidget {
+class _CommentBubble extends ConsumerWidget {
   final TaskCommentModel comment;
   final bool isMe;
   const _CommentBubble({required this.comment, required this.isMe});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final name = comment.authorName ?? 'Unknown';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
-    return Padding(
+    return GestureDetector(
+      // Long-press to report (App Store guideline 1.2); not offered on
+      // your own comments.
+      onLongPress: isMe
+          ? null
+          : () => showReportContentSheet(
+                context,
+                ref,
+                contentType: AppConstants.reportTaskComment,
+                contentId: comment.id,
+                excerpt: comment.content,
+              ),
+      child: Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -815,6 +828,7 @@ class _CommentBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
