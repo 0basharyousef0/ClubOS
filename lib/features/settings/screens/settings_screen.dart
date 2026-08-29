@@ -7,6 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../app/theme.dart';
 import '../../../core/supabase_client.dart';
 import '../../../features/auth/providers/auth_providers.dart';
+import '../../../features/directory/providers/directory_providers.dart';
+import '../../../shared/models/user_club_role_model.dart';
 import '../../../shared/widgets/gradient_header.dart';
 import '../../../shared/widgets/logout_sheet.dart';
 
@@ -170,9 +172,27 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
 
+            const SizedBox(height: 24),
+            const _SectionLabel(label: 'Danger Zone'),
+            const SizedBox(height: 8),
             if (isPresident) ...[
-              const SizedBox(height: 24),
-              const _SectionLabel(label: 'Danger Zone'),
+              _SettingsTile(
+                icon: Icons.workspace_premium_outlined,
+                title: 'Transfer Presidency',
+                subtitle: 'Hand $clubName over to another member',
+                onTap: () => _showTransferSheet(context, ref),
+              ),
+              const SizedBox(height: 8),
+              _SettingsTile(
+                icon: Icons.auto_awesome_rounded,
+                title: 'Start a New Term',
+                subtitle: 'Clear last term\'s work and start fresh',
+                onTap: () => _showResetTermSheet(
+                  context,
+                  ref,
+                  clubName.isNotEmpty ? clubName : 'this club',
+                ),
+              ),
               const SizedBox(height: 8),
               _SettingsTile(
                 icon: Icons.delete_forever_rounded,
@@ -182,7 +202,33 @@ class SettingsScreen extends ConsumerWidget {
                 titleColor: AppColors.error,
                 onTap: () => _showDeleteClubSheet(context, ref, clubName),
               ),
+              const SizedBox(height: 8),
             ],
+            // Presidents can't walk away from a club — they transfer or
+            // delete it (the tiles above). Everyone else can leave.
+            if (!isPresident && activeRole != null) ...[
+              _SettingsTile(
+                icon: Icons.exit_to_app_rounded,
+                title: 'Leave Club',
+                subtitle: clubName.isNotEmpty
+                    ? 'Leave $clubName but keep your account'
+                    : 'Leave this club but keep your account',
+                onTap: () => _showLeaveClubSheet(
+                  context,
+                  ref,
+                  clubName.isNotEmpty ? clubName : 'this club',
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            _SettingsTile(
+              icon: Icons.person_off_rounded,
+              title: 'Delete Account',
+              subtitle: 'Permanently delete your account and personal data',
+              iconColor: AppColors.error,
+              titleColor: AppColors.error,
+              onTap: () => _showDeleteAccountSheet(context, ref),
+            ),
 
                 const SizedBox(height: 32),
               ],
@@ -228,6 +274,146 @@ class SettingsScreen extends ConsumerWidget {
           }
         },
       ),
+    );
+  }
+
+  void _showTransferSheet(BuildContext context, WidgetRef ref) {
+    final role = ref.read(activeClubRoleProvider);
+    if (role == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _TransferPresidencySheet(
+        clubName: role.club?.name ?? 'this club',
+        loadMembers: () async {
+          final members = await ref
+              .read(directoryRepositoryProvider)
+              .getApprovedMembers(role.clubId);
+          return members.where((m) => m.userId != role.userId).toList();
+        },
+        onConfirm: (member) async {
+          await ref.read(authRepositoryProvider).transferPresidency(
+                clubId: role.clubId,
+                newPresidentId: member.userId,
+              );
+          // The caller is a Vice President now — drop the stale selection
+          // and re-fetch roles so the whole app picks up the demotion.
+          ref.read(selectedClubRoleProvider.notifier).state = null;
+          ref.invalidate(userClubRolesProvider);
+        },
+      ),
+    );
+  }
+
+  /// Wiping a term is permanent, so this carries the same
+  /// type-the-club-name ceremony as club deletion.
+  void _showResetTermSheet(
+    BuildContext context,
+    WidgetRef ref,
+    String clubName,
+  ) {
+    final role = ref.read(activeClubRoleProvider);
+    if (role == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ResetTermSheet(
+        clubName: clubName,
+        onConfirm: (clearRoster) async {
+          await ref.read(authRepositoryProvider).resetClubTerm(
+                clubId: role.clubId,
+                clearRoster: clearRoster,
+              );
+          // Every list in the app is now stale.
+          ref.invalidate(userClubRolesProvider);
+        },
+      ),
+    );
+  }
+
+  /// Leaving is recoverable (the member can request to rejoin), so this
+  /// is a single confirmation — deliberately lighter than the
+  /// type-to-confirm ceremony guarding account and club deletion.
+  void _showLeaveClubSheet(
+    BuildContext context,
+    WidgetRef ref,
+    String clubName,
+  ) {
+    final role = ref.read(activeClubRoleProvider);
+    if (role == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _LeaveClubSheet(
+        clubName: clubName,
+        onConfirm: () async {
+          await ref.read(authRepositoryProvider).leaveClub(role.clubId);
+          // The active selection is stale now; re-fetch roles so the
+          // app routes to a remaining club (or the join flow).
+          ref.read(selectedClubRoleProvider.notifier).state = null;
+          ref.invalidate(userClubRolesProvider);
+        },
+        onLeft: () {
+          if (context.mounted) context.go('/');
+        },
+      ),
+    );
+  }
+
+  void _showDeleteAccountSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DeleteAccountSheet(
+        loadStatus: () => _loadDeletionStatus(ref),
+        onTransferInstead: () => _showTransferSheet(context, ref),
+        onDelete: () async {
+          await ref.read(authRepositoryProvider).deleteAccount();
+          ref.read(selectedClubRoleProvider.notifier).state = null;
+        },
+        onDeleted: () {
+          if (context.mounted) context.go('/login');
+        },
+      ),
+    );
+  }
+
+  /// Presidents of clubs with other approved members cannot delete their
+  /// account until they transfer presidency (or delete the club); clubs
+  /// where they are the only member dissolve with the account. The RPC
+  /// enforces the same rules server-side — this precheck is for UX.
+  Future<_DeletionStatus> _loadDeletionStatus(WidgetRef ref) async {
+    final roles = await ref.read(authRepositoryProvider).getUserClubRoles();
+    final dirRepo = ref.read(directoryRepositoryProvider);
+    final activeRole = ref.read(activeClubRoleProvider);
+
+    final blocking = <String>[];
+    final dissolving = <String>[];
+    var activeClubBlocks = false;
+
+    for (final r in roles.where((r) => r.isApproved && r.isPresident)) {
+      final members = await dirRepo.getApprovedMembers(r.clubId);
+      final hasOthers = members.any((m) => m.userId != r.userId);
+      final name = r.club?.name ?? 'Unnamed club';
+      if (hasOthers) {
+        blocking.add(name);
+        if (r.clubId == activeRole?.clubId) activeClubBlocks = true;
+      } else {
+        dissolving.add(name);
+      }
+    }
+
+    return _DeletionStatus(
+      blockingClubs: blocking,
+      dissolvingClubs: dissolving,
+      activeClubBlocks: activeClubBlocks,
     );
   }
 
@@ -1041,6 +1227,1534 @@ class _DeleteClubSheetState extends State<_DeleteClubSheet> {
   }
 }
 
+// ── Transfer presidency sheet ─────────────────────────────────
+
+class _TransferPresidencySheet extends StatefulWidget {
+  final String clubName;
+  final Future<List<UserClubRoleModel>> Function() loadMembers;
+  final Future<void> Function(UserClubRoleModel member) onConfirm;
+
+  const _TransferPresidencySheet({
+    required this.clubName,
+    required this.loadMembers,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_TransferPresidencySheet> createState() =>
+      _TransferPresidencySheetState();
+}
+
+class _TransferPresidencySheetState extends State<_TransferPresidencySheet> {
+  List<UserClubRoleModel>? _members;
+  UserClubRoleModel? _selected;
+  int _step = 0; // 0 = pick member, 1 = confirm
+  final _nameController = TextEditingController();
+  bool _isTransferring = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.loadMembers().then((members) {
+      if (mounted) setState(() => _members = members);
+    }).catchError((_) {
+      if (mounted) {
+        setState(() {
+          _members = const [];
+          _error = 'Could not load members. Try again.';
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  String get _selectedName => _selected?.profile?.fullName.trim() ?? '';
+
+  bool get _nameMatches =>
+      _selectedName.isNotEmpty &&
+      _nameController.text.trim().toLowerCase() ==
+          _selectedName.toLowerCase();
+
+  Future<void> _transfer() async {
+    final member = _selected;
+    if (member == null) return;
+    setState(() {
+      _isTransferring = true;
+      _error = null;
+    });
+    try {
+      await widget.onConfirm(member);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '$_selectedName is now the president of ${widget.clubName}. '
+                'You are a Vice President.'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isTransferring = false;
+          _error = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isTransferring = false;
+          _error = 'Could not transfer presidency. Try again.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
+        MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPadding + 24),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        child: _step == 0 ? _buildPickStep() : _buildConfirmStep(),
+      ),
+    );
+  }
+
+  Widget _buildPickStep() {
+    final members = _members;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SheetHandle(),
+        const SizedBox(height: 20),
+        const Text(
+          'Transfer Presidency',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Choose the member who will become the new president of '
+          '${widget.clubName}. You will become a Vice President.',
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (members == null)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (members.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Text(
+              _error ??
+                  'No other approved members yet. Approve a member first — '
+                      'or delete the club instead.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          )
+        else
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 320),
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: members.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final m = members[index];
+                final selected = _selected?.id == m.id;
+                return GestureDetector(
+                  onTap: () => setState(() => _selected = m),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? AppColors.primary.withValues(alpha: 0.06)
+                          : AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color:
+                            selected ? AppColors.primary : AppColors.border,
+                        width: selected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.12),
+                          child: Text(
+                            (m.profile?.fullName.isNotEmpty ?? false)
+                                ? m.profile!.fullName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                m.profile?.fullName ?? 'Unknown member',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                m.roleDisplayName,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (selected)
+                          const Icon(Icons.check_circle_rounded,
+                              color: AppColors.primary, size: 20),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed:
+                _selected == null ? null : () => setState(() => _step = 1),
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Continue',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfirmStep() {
+    final m = _selected!;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SheetHandle(),
+        const SizedBox(height: 20),
+        const Text(
+          'Confirm transfer',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // The successor's details, so the president knows exactly who
+        // is receiving the club.
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                m.profile?.fullName ?? 'Unknown member',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                m.roleDisplayName,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textSecondary),
+              ),
+              if ((m.profile?.email ?? '').isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  m.profile!.email,
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textSecondary),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+            children: [
+              const TextSpan(text: 'Type '),
+              TextSpan(
+                text: _selectedName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const TextSpan(text: ' to confirm.'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _nameController,
+          autofocus: true,
+          autocorrect: false,
+          decoration: InputDecoration(
+            hintText: _selectedName,
+            errorText: _nameController.text.isNotEmpty && !_nameMatches
+                ? 'Name does not match'
+                : null,
+          ),
+          onChanged: (_) => setState(() => _error = null),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          _SheetError(message: _error!),
+        ],
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: (_nameMatches && !_isTransferring) ? _transfer : null,
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: _isTransferring
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text(
+                    'Transfer Presidency',
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed:
+                _isTransferring ? null : () => setState(() => _step = 0),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Back',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Delete account sheet ──────────────────────────────────────
+
+class _DeletionStatus {
+  /// Clubs the user presides over that still have other approved members —
+  /// each blocks deletion until presidency is transferred (or the club
+  /// deleted).
+  final List<String> blockingClubs;
+
+  /// Clubs where the user is president and the only approved member —
+  /// these are deleted together with the account.
+  final List<String> dissolvingClubs;
+
+  final bool activeClubBlocks;
+
+  const _DeletionStatus({
+    required this.blockingClubs,
+    required this.dissolvingClubs,
+    required this.activeClubBlocks,
+  });
+}
+
+class _DeleteAccountSheet extends StatefulWidget {
+  final Future<_DeletionStatus> Function() loadStatus;
+  final VoidCallback onTransferInstead;
+  final Future<void> Function() onDelete;
+  final VoidCallback onDeleted;
+
+  const _DeleteAccountSheet({
+    required this.loadStatus,
+    required this.onTransferInstead,
+    required this.onDelete,
+    required this.onDeleted,
+  });
+
+  @override
+  State<_DeleteAccountSheet> createState() => _DeleteAccountSheetState();
+}
+
+class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
+  static const _confirmWord = 'DELETE';
+
+  _DeletionStatus? _status;
+  int _step = 0; // 0 = warning (or blocked), 1 = confirm
+  final _confirmController = TextEditingController();
+  bool _understood = false;
+  bool _isDeleting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.loadStatus().then((status) {
+      if (mounted) setState(() => _status = status);
+    }).catchError((_) {
+      if (mounted) {
+        // Fail open on the precheck: the RPC re-validates server-side
+        // and rejects a blocked president with a readable message.
+        setState(() {
+          _status = const _DeletionStatus(
+            blockingClubs: [],
+            dissolvingClubs: [],
+            activeClubBlocks: false,
+          );
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  bool get _wordMatches =>
+      _confirmController.text.trim().toUpperCase() == _confirmWord;
+
+  Future<void> _delete() async {
+    setState(() {
+      _isDeleting = true;
+      _error = null;
+    });
+    try {
+      await widget.onDelete();
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onDeleted();
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+          _error = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+          _error = 'Could not delete your account. Please try again.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
+        MediaQuery.of(context).padding.bottom;
+
+    final status = _status;
+    final Widget body;
+    if (status == null) {
+      body = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    } else if (status.blockingClubs.isNotEmpty) {
+      body = _buildBlockedStep(status);
+    } else {
+      body = _step == 0 ? _buildWarningStep(status) : _buildConfirmStep();
+    }
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPadding + 24),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        child: body,
+      ),
+    );
+  }
+
+  Widget _buildBlockedStep(_DeletionStatus status) {
+    final clubs = status.blockingClubs.map((c) => '"$c"').join(', ');
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SheetHandle(),
+        const SizedBox(height: 28),
+        Center(
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.workspace_premium_outlined,
+              color: AppColors.warning,
+              size: 30,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Transfer your presidency first',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'You are the president of $clubs. A club can\'t be left without '
+          'a president — transfer the presidency to another member (or '
+          'delete the club), then delete your account.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        if (status.blockingClubs.length > 1 ||
+            !status.activeClubBlocks) ...[
+          const SizedBox(height: 8),
+          const Text(
+            'Use the club switcher to open each club and transfer or '
+            'delete it from Settings.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+        ],
+        const SizedBox(height: 28),
+        if (status.activeClubBlocks) ...[
+          SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                widget.onTransferInstead();
+              },
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Transfer Presidency',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWarningStep(_DeletionStatus status) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SheetHandle(),
+        const SizedBox(height: 28),
+        Center(
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.person_off_rounded,
+              color: AppColors.error,
+              size: 30,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Delete Account?',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'This permanently deletes your account and cannot be undone. '
+          'The following is removed:',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const _ConsequenceRow(
+            icon: Icons.badge_outlined,
+            label: 'Your name, emails and login'),
+        const SizedBox(height: 8),
+        const _ConsequenceRow(
+            icon: Icons.people_alt_outlined,
+            label: 'Your club memberships and directory listing'),
+        const SizedBox(height: 8),
+        const _ConsequenceRow(
+            icon: Icons.notifications_off_outlined,
+            label: 'Your notifications and registered devices'),
+        for (final club in status.dissolvingClubs) ...[
+          const SizedBox(height: 8),
+          _ConsequenceRow(
+            icon: Icons.delete_forever_rounded,
+            label: '"$club" — you are its only member, so it is deleted',
+          ),
+        ],
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.history_rounded,
+                  size: 16, color: AppColors.textSecondary),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Tasks, comments, files and posts you contributed stay '
+                  'with your clubs, shown as "Former member".',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: () => setState(() => _step = 1),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Continue',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfirmStep() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SheetHandle(),
+        const SizedBox(height: 24),
+        const Text(
+          'Confirm deletion',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+            children: [
+              const TextSpan(text: 'Type '),
+              TextSpan(
+                text: _confirmWord,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const TextSpan(text: ' to confirm.'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _confirmController,
+          autofocus: true,
+          autocorrect: false,
+          textCapitalization: TextCapitalization.characters,
+          decoration: InputDecoration(
+            hintText: _confirmWord,
+            errorText: _confirmController.text.isNotEmpty && !_wordMatches
+                ? 'Type $_confirmWord to continue'
+                : null,
+          ),
+          onChanged: (_) => setState(() => _error = null),
+        ),
+        const SizedBox(height: 20),
+        GestureDetector(
+          onTap: () => setState(() => _understood = !_understood),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: _understood,
+                  onChanged: (v) => setState(() => _understood = v ?? false),
+                  activeColor: AppColors.error,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'I understand my account and personal data are '
+                  'permanently deleted and cannot be recovered.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          _SheetError(message: _error!),
+        ],
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed:
+                (_wordMatches && _understood && !_isDeleting) ? _delete : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: AppColors.error.withValues(alpha: 0.35),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: _isDeleting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Permanently Delete Account',
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed: _isDeleting ? null : () => setState(() => _step = 0),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Back',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Small shared sheet pieces ─────────────────────────────────
+
+/// Two-step reset: review what goes and choose whether the roster goes
+/// with it, then type the club name to confirm. Permanent, so it wears
+/// the same ceremony as club deletion.
+class _ResetTermSheet extends StatefulWidget {
+  final String clubName;
+  final Future<void> Function(bool clearRoster) onConfirm;
+
+  const _ResetTermSheet({required this.clubName, required this.onConfirm});
+
+  @override
+  State<_ResetTermSheet> createState() => _ResetTermSheetState();
+}
+
+class _ResetTermSheetState extends State<_ResetTermSheet> {
+  final _confirmController = TextEditingController();
+  int _step = 0; // 0 = review, 1 = type-to-confirm
+  bool _clearRoster = false;
+  bool _isResetting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _confirmController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  bool get _canConfirm =>
+      _confirmController.text.trim().toLowerCase() ==
+      widget.clubName.trim().toLowerCase();
+
+  Future<void> _reset() async {
+    setState(() {
+      _isResetting = true;
+      _error = null;
+    });
+    try {
+      await widget.onConfirm(_clearRoster);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${widget.clubName} is ready for a new term.'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isResetting = false;
+          _error = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isResetting = false;
+          _error = 'Could not start a new term. Try again.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
+        MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPadding + 24),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        child: _step == 0 ? _buildReviewStep() : _buildConfirmStep(),
+      ),
+    );
+  }
+
+  Widget _buildReviewStep() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SheetHandle(),
+        const SizedBox(height: 28),
+        Center(
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.auto_awesome_rounded,
+                color: Color(0xFF8B5CF6), size: 30),
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Start a new term',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Clears last term\'s work from ${widget.clubName} so your new '
+          'board starts on a clean slate. This cannot be undone.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ConsequenceRow(
+                icon: Icons.delete_sweep_outlined,
+                label: 'Erased: tasks, comments and attachments, events '
+                    'and RSVPs, announcements, polls and votes, meetings, '
+                    'and the activity log',
+              ),
+              SizedBox(height: 10),
+              _ConsequenceRow(
+                icon: Icons.shield_outlined,
+                label: 'Kept: the club and its name, the constitution '
+                    'and resources, and you as president',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Full board turnover is common but not universal — a director
+        // often stays on as a VP, so this is opt-in.
+        GestureDetector(
+          onTap: () => setState(() => _clearRoster = !_clearRoster),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _clearRoster
+                  ? AppColors.error.withValues(alpha: 0.06)
+                  : AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _clearRoster ? AppColors.error : AppColors.border,
+                width: _clearRoster ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  _clearRoster
+                      ? Icons.check_box_rounded
+                      : Icons.check_box_outline_blank_rounded,
+                  size: 22,
+                  color:
+                      _clearRoster ? AppColors.error : AppColors.textSecondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Also remove all other members',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _clearRoster
+                            ? 'Everyone but you leaves the club. Their '
+                                'accounts are untouched and they can request '
+                                'to join again.'
+                            : 'Leave unchecked to keep your current VPs and '
+                                'directors.',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: () => setState(() => _step = 1),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Continue',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfirmStep() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SheetHandle(),
+        const SizedBox(height: 28),
+        const Text(
+          'Type the club name to confirm',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _clearRoster
+              ? 'This erases last term\'s work AND removes every other '
+                  'member from ${widget.clubName}.'
+              : 'This erases last term\'s work from ${widget.clubName}.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _confirmController,
+          autocorrect: false,
+          enableSuggestions: false,
+          textCapitalization: TextCapitalization.none,
+          decoration: InputDecoration(
+            hintText: widget.clubName,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 16),
+          _SheetError(message: _error!),
+        ],
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: (!_canConfirm || _isResetting) ? null : _reset,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: AppColors.border,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: _isResetting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text(
+                    'Start New Term',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed: _isResetting ? null : () => setState(() => _step = 0),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Back',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Single-step confirmation for leaving one club. Lighter than the
+/// account/club deletion sheets on purpose: leaving is recoverable, and
+/// matching their type-to-confirm weight would train people to click
+/// through the irreversible ones too.
+class _LeaveClubSheet extends StatefulWidget {
+  final String clubName;
+  final Future<void> Function() onConfirm;
+  final VoidCallback onLeft;
+
+  const _LeaveClubSheet({
+    required this.clubName,
+    required this.onConfirm,
+    required this.onLeft,
+  });
+
+  @override
+  State<_LeaveClubSheet> createState() => _LeaveClubSheetState();
+}
+
+class _LeaveClubSheetState extends State<_LeaveClubSheet> {
+  bool _isLeaving = false;
+  String? _error;
+
+  Future<void> _leave() async {
+    setState(() {
+      _isLeaving = true;
+      _error = null;
+    });
+    try {
+      await widget.onConfirm();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('You left ${widget.clubName}.'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+        widget.onLeft();
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLeaving = false;
+          _error = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLeaving = false;
+          _error = 'Could not leave the club. Try again.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
+        MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPadding + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _SheetHandle(),
+          const SizedBox(height: 28),
+          Center(
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.exit_to_app_rounded,
+                  color: AppColors.warning, size: 30),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Leave ${widget.clubName}?',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Your account and any other clubs you belong to are not '
+            'affected. You can request to join again later.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ConsequenceRow(
+                  icon: Icons.visibility_off_outlined,
+                  label: 'You lose access to this club\'s tasks, events, '
+                      'polls and announcements',
+                ),
+                SizedBox(height: 10),
+                _ConsequenceRow(
+                  icon: Icons.event_busy_outlined,
+                  label: 'Upcoming RSVPs, meeting invites and open polls '
+                      'drop you from their lists',
+                ),
+                SizedBox(height: 10),
+                _ConsequenceRow(
+                  icon: Icons.groups_outlined,
+                  label: 'Your president is notified, and any directors '
+                      'reporting to you are unassigned',
+                ),
+                SizedBox(height: 10),
+                _ConsequenceRow(
+                  icon: Icons.history_rounded,
+                  label: 'Work you already created stays in the club, '
+                      'still under your name',
+                ),
+              ],
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 16),
+            _SheetError(message: _error!),
+          ],
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _isLeaving ? null : _leave,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: _isLeaving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text(
+                      'Leave Club',
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 52,
+            child: OutlinedButton(
+              onPressed: _isLeaving ? null : () => Navigator.pop(context),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                side: const BorderSide(color: AppColors.border),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle();
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: AppColors.border,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      );
+}
+
+class _SheetError extends StatelessWidget {
+  final String message;
+  const _SheetError({required this.message});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.error.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.error_outline, color: AppColors.error, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
 class _ConsequenceRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1049,14 +2763,18 @@ class _ConsequenceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 16, color: AppColors.error),
         const SizedBox(width: 10),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppColors.textSecondary,
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
           ),
         ),
       ],

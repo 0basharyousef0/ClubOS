@@ -28,6 +28,10 @@ const TITLES: Record<string, string> = {
   poll_created: "New poll",
   membership_approved: "Membership approved",
   join_request: "New join request",
+  meeting_scheduled: "New meeting",
+  meeting_reminder: "Meeting reminder",
+  meeting_cancelled: "Meeting cancelled",
+  term_started: "New term started",
 };
 
 function base64url(input: ArrayBuffer | string): string {

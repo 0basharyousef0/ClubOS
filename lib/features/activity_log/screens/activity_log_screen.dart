@@ -327,6 +327,12 @@ class _ActivityTile extends StatelessWidget {
         assignee != null) {
       subject = '$subject → $assignee';
     }
+    // Transfers carry who the presidency went to.
+    final newPresident = entry.details?['new_president'] as String?;
+    if (entry.actionType == AppConstants.actionPresidencyTransferred &&
+        newPresident != null) {
+      subject = '→ $newPresident';
+    }
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -617,6 +623,8 @@ const _actionTypes = <String>[
   AppConstants.actionEventRsvp,
   AppConstants.actionAnnouncementPosted,
   AppConstants.actionPollVote,
+  AppConstants.actionMemberLeft,
+  AppConstants.actionPresidencyTransferred,
 ];
 
 String _actionLabel(String type) => switch (type) {
@@ -627,6 +635,8 @@ String _actionLabel(String type) => switch (type) {
   AppConstants.actionEventRsvp => 'RSVPs',
   AppConstants.actionAnnouncementPosted => 'Announced',
   AppConstants.actionPollVote => 'Votes',
+  AppConstants.actionMemberLeft => 'Departures',
+  AppConstants.actionPresidencyTransferred => 'Transfers',
   _ => 'Other',
 };
 
@@ -638,6 +648,8 @@ String _actionSentence(String type) => switch (type) {
   AppConstants.actionEventRsvp => 'RSVP’d to an event',
   AppConstants.actionAnnouncementPosted => 'Posted an announcement',
   AppConstants.actionPollVote => 'Voted in a poll',
+  AppConstants.actionMemberLeft => 'Deleted their account and left the club',
+  AppConstants.actionPresidencyTransferred => 'Transferred the presidency',
   _ => 'Recorded an action',
 };
 
@@ -649,6 +661,8 @@ IconData _actionIcon(String type) => switch (type) {
   AppConstants.actionEventRsvp => Icons.event_available_outlined,
   AppConstants.actionAnnouncementPosted => Icons.campaign_outlined,
   AppConstants.actionPollVote => Icons.how_to_vote_outlined,
+  AppConstants.actionMemberLeft => Icons.person_off_outlined,
+  AppConstants.actionPresidencyTransferred => Icons.workspace_premium_outlined,
   _ => Icons.history_rounded,
 };
 
@@ -660,6 +674,8 @@ Color _actionColor(String type) => switch (type) {
   AppConstants.actionEventRsvp => AppColors.primary,
   AppConstants.actionAnnouncementPosted => AppColors.warning,
   AppConstants.actionPollVote => const Color(0xFF8B5CF6),
+  AppConstants.actionMemberLeft => AppColors.error,
+  AppConstants.actionPresidencyTransferred => const Color(0xFFEC4899),
   _ => AppColors.textSecondary,
 };
 

@@ -16,6 +16,43 @@ class FcmService {
     if (!firebaseReady) return;
     await _requestPermission();
     _setupForegroundHandler();
+    _setupTokenRefreshHandler();
+  }
+
+  /// On iOS, FCM cannot mint a token until APNs has handed one over.
+  /// Simulators never get an APNs token at all, and on a real device it
+  /// can land slightly after launch — so return null rather than letting
+  /// firebase_messaging throw `apns-token-not-set`. Late arrivals are
+  /// picked up by the onTokenRefresh handler below.
+  static Future<String?> _deviceToken() async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      final apns = await _messaging.getAPNSToken();
+      if (apns == null) return null;
+    }
+    return _messaging.getToken();
+  }
+
+  /// Registers the token whenever Firebase issues a new one — including
+  /// the first one on iOS if APNs was not ready during registerToken().
+  static void _setupTokenRefreshHandler() {
+    _messaging.onTokenRefresh.listen((token) async {
+      try {
+        await _upsertToken(token);
+      } catch (e) {
+        if (kDebugMode) debugPrint('FCM token refresh upsert failed: $e');
+      }
+    });
+  }
+
+  static Future<void> _upsertToken(String token) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    await supabase.from(AppConstants.tableFcmTokens).upsert({
+      'user_id': user.id,
+      'token': token,
+      'platform': defaultTargetPlatform.name,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'token');
   }
 
   static Future<void> _requestPermission() async {
@@ -31,7 +68,7 @@ class FcmService {
 
   static Future<String?> getToken() async {
     if (!firebaseReady) return null;
-    return await _messaging.getToken();
+    return _deviceToken();
   }
 
   /// Upserts this device's FCM token for the signed-in user.
@@ -40,16 +77,12 @@ class FcmService {
   static Future<void> registerToken() async {
     if (!firebaseReady) return;
     try {
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
-      final token = await _messaging.getToken();
+      if (supabase.auth.currentUser == null) return;
+      // Null on a simulator, or before APNs has issued a token on iOS;
+      // onTokenRefresh registers it once it exists.
+      final token = await _deviceToken();
       if (token == null) return;
-      await supabase.from(AppConstants.tableFcmTokens).upsert({
-        'user_id': user.id,
-        'token': token,
-        'platform': defaultTargetPlatform.name,
-        'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'token');
+      await _upsertToken(token);
     } catch (e) {
       // Token registration must never break auth flows.
       if (kDebugMode) debugPrint('FCM registerToken failed: $e');
@@ -61,7 +94,7 @@ class FcmService {
   static Future<void> removeToken() async {
     if (!firebaseReady) return;
     try {
-      final token = await _messaging.getToken();
+      final token = await _deviceToken();
       if (token == null) return;
       await supabase
           .from(AppConstants.tableFcmTokens)

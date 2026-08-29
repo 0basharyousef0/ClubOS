@@ -10,7 +10,7 @@ Built with Flutter (iOS & Android), Supabase, and Firebase Cloud Messaging.
 
 - **Role-based access** — a President → Vice President → Director hierarchy, with permissions enforced per role and by PostgreSQL Row-Level Security.
 - **Multi-club membership** — a user can belong to several clubs at once, each with its own role; join requests are approved by the club President.
-- **Tasks** — create, assign, and track tasks with due dates, urgency, status, comments, and file attachments.
+- **Tasks** — create, assign, and track tasks with due dates, urgency, status, and comments.
 - **Events** — shared calendar, event creation, and RSVPs.
 - **Announcements** — a club-wide announcement board.
 - **Polls & voting** — audience-targeted polls (whole club / VPs / Directors) with one vote per member and shared results.

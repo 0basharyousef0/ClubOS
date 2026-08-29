@@ -13,7 +13,7 @@ ClubOS is a cross-platform mobile app (iOS & Android) that helps university stud
 |-------|-----------|---------|
 | Mobile (iOS & Android) | Flutter | Cross-platform UI |
 | Language | Dart | Flutter's native language |
-| Backend & Database | Supabase (PostgreSQL) | Auth, database, real-time, storage |
+| Backend & Database | Supabase (PostgreSQL) | Auth, database, real-time |
 | Push Notifications | Firebase Cloud Messaging (FCM) | iOS & Android push delivery |
 | State Management | Riverpod | App-wide state and async data |
 | Navigation | GoRouter | Declarative routing |
@@ -32,7 +32,7 @@ ClubOS/
 │   ├── features/
 │   │   ├── auth/                  # Login, registration, club selection, approval flow
 │   │   ├── dashboard/             # Personalized home screen
-│   │   ├── tasks/                 # Task creation, assignment, comments, attachments
+│   │   ├── tasks/                 # Task creation, assignment, comments
 │   │   ├── events/                # Event calendar, creation, RSVP
 │   │   ├── announcements/         # Announcement board
 │   │   ├── directory/             # Member directory
@@ -136,16 +136,6 @@ task_comments (
   created_at timestamptz
 )
 
--- Task Attachments
-task_attachments (
-  id uuid PRIMARY KEY,
-  task_id uuid REFERENCES tasks,
-  file_url text NOT NULL,
-  file_name text NOT NULL,
-  uploaded_by uuid REFERENCES profiles,
-  created_at timestamptz
-)
-
 -- Events
 events (
   id uuid PRIMARY KEY,
@@ -203,6 +193,27 @@ poll_votes (
   UNIQUE (poll_id, user_id)        -- One vote per user per poll
 )
 
+-- Meetings (scheduled reminders, not a video-call replacement)
+meetings (
+  id uuid PRIMARY KEY,
+  club_id uuid REFERENCES clubs,
+  title text NOT NULL,
+  notes text,
+  created_by uuid REFERENCES profiles,
+  audience text NOT NULL,          -- 'vps' | 'vps_directors' | 'my_directors' | 'custom'
+  scheduled_at timestamptz NOT NULL, -- next occurrence; rolled forward by pg_cron
+  recurrence text NOT NULL,        -- 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  reminder_offset_minutes int,     -- NULL = no automated reminder
+  reminder_sent boolean,           -- for the current occurrence
+  created_at timestamptz
+)
+
+meeting_attendees (
+  meeting_id uuid REFERENCES meetings,
+  user_id uuid REFERENCES profiles,
+  PRIMARY KEY (meeting_id, user_id)
+)
+
 -- Activity Log (President view only)
 activity_log (
   id uuid PRIMARY KEY,
@@ -234,7 +245,6 @@ notifications (
 | Assign tasks | ✅ | ✅ | ❌ |
 | View & update own tasks | ✅ | ✅ | ✅ |
 | Comment on assigned tasks | ✅ | ✅ | ✅ |
-| Attach files to tasks | ✅ | ✅ | ✅ |
 | Post events | ✅ | ✅ | ❌ |
 | View events | ✅ | ✅ | ✅ |
 | RSVP to events | ❌ (views RSVPs) | ✅ | ✅ |
@@ -271,6 +281,16 @@ notifications (
 - Each user can only vote once per poll
 - Poll results are visible to everyone who can see the poll
 
+### Meetings
+- A meeting is a scheduled reminder (agenda/link go in `notes`) — not a Teams/Zoom replacement
+- **President** can schedule for: VPs, VPs & Directors, or a custom pick of any approved member
+- **VP** can schedule for: VPs (& President), their own directors + themselves, or a custom pick limited to that same circle (enforced by `can_add_meeting_attendee` RLS)
+- Directors cannot schedule meetings
+- Invitees are snapshotted into `meeting_attendees` at creation (like `poll_eligible_voters`); everyone invited is notified immediately (`meeting_scheduled`)
+- Optional automated reminder a chosen time before start (1h–1 day, `reminder_offset_minutes`); `pg_cron` runs `process_meetings_due()` every 5 min to send `meeting_reminder` notifications and roll recurring meetings (`daily`/`weekly`/`biweekly`/`monthly`) to their next occurrence 1 hour after start
+- Creator can cancel; attendees of future meetings get a `meeting_cancelled` notification (BEFORE DELETE trigger)
+- Note: pg_cron does not run while the free-tier project is paused — reminders resume on restore
+
 ### Event RSVP
 - Only VPs and Directors can RSVP
 - Only the President can view the RSVP list
@@ -278,6 +298,32 @@ notifications (
 ### Destructive Actions (require multi-step confirmation)
 - **Delete club** — President only. Requires typing the club name to confirm, then a final "I understand this is permanent" confirmation
 - **Remove a member** — President only. Requires a confirmation dialog before proceeding
+- **Delete account** — every user (App Store 5.1.1(v)). Handled by the `delete_account()` RPC:
+  - Erases the person, keeps the work: auth user + memberships + notifications + FCM tokens deleted; the `profiles` row stays as an anonymized tombstone (`full_name = 'Former member'`, emails cleared, `deleted_at` set) so tasks/comments/events/polls keep valid references
+  - A president of a club that has other approved members is blocked — they must transfer presidency (or delete the club) first; if the president is the club's only approved member, the club is deleted with the account
+  - When a VP leaves, their directors' `reports_to` is cleared and the president + those directors are notified the club is missing that VP position (e.g. "missing a VP Events"); when a director leaves, the president and their VP are notified
+  - Future RSVPs and open-poll eligibility are removed; past history and cast votes stay
+
+### Starting a New Term (annual turnover)
+- `reset_club_term(club_id, clear_roster)` RPC — **president only**. University clubs turn over yearly and last term's work does not carry over
+- **Erased:** tasks (+ comments), events (+ RSVPs), announcements, polls (+ options/votes/eligibility), meetings (+ attendees), the activity log, and the club's notifications. Children come off via existing `ON DELETE CASCADE`
+- **Kept:** the club and its name, `constitution_content`, and the president. `clear_roster = true` additionally deletes every other membership row (approved/pending/rejected/left) for a full board handover — accounts and logins are untouched and those people can request to rejoin
+- Writes one `term_started` activity-log entry so the fresh log explains itself, and (when the roster is kept) notifies remaining members why the club looks empty
+- Deliberately a **hard delete, not an `archived_at` flag**: an archive flag would have to be filtered in every query and RLS policy across five features, and missing one leaks last term's content. The ceremony (review step + opt-in roster checkbox + type-the-club-name) lives in the UI
+### No file storage
+Task file attachments were **removed** (20260829040000): clubs share files over WhatsApp/Teams instead. The `task_attachments` table, the `task-attachments` bucket policies, and the `file_picker` + `url_launcher` dependencies are all gone. The empty bucket row itself survives — Supabase's statement-level `protect_objects_delete` trigger on `storage.objects` rejects direct SQL deletes on the storage tables, so it has to be removed from the dashboard. The app no longer uses Supabase Storage at all; **do not reintroduce it without also adding the iOS photo-library/camera usage strings** that `file_picker` requires.
+
+### Leaving a Club
+- `leave_club(club_id)` RPC — VPs and directors only; **presidents are rejected** (transfer presidency or delete the club first, same rule as account deletion)
+- The membership row is **kept with `status = 'left'`**, not deleted: `profiles_select` grants profile reads via shared `user_club_roles` rows, so hard-deleting would make the leaver's name render blank on every task/comment/poll they authored. Directory, member pickers and approvals all filter on `approved`/`pending`, and routing only reads `isApproved`/`isPending`, so a `'left'` row is invisible everywhere it should be
+- Mirrors `delete_account()`'s departure bookkeeping, scoped to one club: notifies the president (and directors orphaned by a departing VP), clears `reports_to` **for that club only**, drops future RSVPs, future meeting invites and open-poll eligibility (with the same auto-close rule), and clears that club's notifications. The account, other clubs, device tokens and authored content are untouched
+- Rejoining is allowed: `joinClub()` **upserts** on `(user_id, club_id)`, and the narrow `ucr_rejoin` RLS policy permits only a self-owned `'left' → 'pending'` flip as VP/director — verified it cannot self-approve, escalate to president, or mutate another user's row
+
+### Presidency Transfer
+- `transfer_presidency(club_id, new_president_id)` RPC — President only; target must be an approved member of the club
+- The outgoing president becomes a Vice President; the successor becomes President (title reset)
+- If the successor was a VP, their directors are unlinked and notified the club is missing that VP position
+- When a new VP with a matching title is approved later, orphaned directors are automatically re-linked (`'VP Events' → 'Events Director'` convention, `relink_directors_on_vp_approval` trigger)
 
 ### Activity Log
 - Automatically written to on: task status changes, RSVP actions, announcement posts, poll votes
@@ -346,7 +392,6 @@ Work through these phases in order. Do not start a new phase until the current o
 - [ ] Task detail screen
 - [ ] Status update by assigned member (not_started → in_progress → complete)
 - [ ] Task comments (assigned member only)
-- [ ] File attachments on tasks (upload to Supabase Storage)
 
 ### Phase 5 — Events
 - [ ] Event creation (P and VP)

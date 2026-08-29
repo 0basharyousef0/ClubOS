@@ -1,4 +1,3 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants.dart';
@@ -109,52 +108,6 @@ class TasksRepository {
     return (response as List)
         .map((e) => UserClubRoleModel.fromJson(e as Map<String, dynamic>))
         .toList();
-  }
-
-  // Attachments
-  Future<void> uploadAttachment(String taskId, PlatformFile file) async {
-    final bytes = file.bytes;
-    if (bytes == null) return;
-
-    // Path format: {task_id}/{epoch}_{filename}
-    // Storage RLS policy derives task membership from the first path segment.
-    final path = '$taskId/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-    await supabase.storage
-        .from(AppConstants.bucketTaskAttachments)
-        .uploadBinary(path, bytes);
-
-    // Bucket is private — store the path and generate signed URLs on read.
-    final user = supabase.auth.currentUser!;
-    await supabase.from(AppConstants.tableTaskAttachments).insert({
-      'task_id': taskId,
-      'file_url': path,
-      'file_name': file.name,
-      'uploaded_by': user.id,
-    });
-  }
-
-  Future<List<Map<String, dynamic>>> getAttachments(String taskId) async {
-    final response = await supabase
-        .from(AppConstants.tableTaskAttachments)
-        .select()
-        .eq('task_id', taskId)
-        .order('created_at');
-
-    final result = <Map<String, dynamic>>[];
-    for (final row in (response as List)) {
-      final map = Map<String, dynamic>.from(row as Map<String, dynamic>);
-      final filePath = map['file_url'] as String? ?? '';
-      if (!filePath.startsWith('http')) {
-        try {
-          final signedUrl = await supabase.storage
-              .from(AppConstants.bucketTaskAttachments)
-              .createSignedUrl(filePath, 3600);
-          map['file_url'] = signedUrl;
-        } catch (_) {}
-      }
-      result.add(map);
-    }
-    return result;
   }
 
   Future<void> deleteTask(String id) async {

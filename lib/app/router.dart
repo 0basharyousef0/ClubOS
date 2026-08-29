@@ -20,6 +20,8 @@ import '../features/auth/screens/reset_password_screen.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
 import '../features/directory/screens/directory_screen.dart';
 import '../features/directory/screens/member_profile_screen.dart';
+import '../features/meetings/screens/meeting_create_screen.dart';
+import '../features/meetings/screens/meetings_screen.dart';
 import '../features/more/screens/more_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/settings/screens/settings_screen.dart';
@@ -330,6 +332,24 @@ final appRouter = GoRouter(
           name: 'more',
           pageBuilder: (_, s) =>
               _TabPage(key: s.pageKey, child: const MoreScreen()),
+        ),
+
+        // ── Meetings ───────────────────────────────────────────
+        GoRoute(
+          path: '/meetings',
+          name: 'meetings',
+          pageBuilder: (_, s) =>
+              _TabPage(key: s.pageKey, child: const MeetingsScreen()),
+          routes: [
+            GoRoute(
+              path: 'create',
+              name: 'meeting-create',
+              pageBuilder: (_, s) => _PushPage(
+                key: s.pageKey,
+                child: const MeetingCreateScreen(),
+              ),
+            ),
+          ],
         ),
 
         // ── Announcements ──────────────────────────────────────

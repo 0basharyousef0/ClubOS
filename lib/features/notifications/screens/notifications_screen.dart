@@ -135,6 +135,12 @@ IconData _typeIcon(String type) => switch (type) {
   AppConstants.notifPollCreated => Icons.how_to_vote_outlined,
   AppConstants.notifMembershipApproved => Icons.verified_user_outlined,
   AppConstants.notifJoinRequest => Icons.person_add_alt_1_outlined,
+  AppConstants.notifMemberLeft => Icons.person_off_outlined,
+  AppConstants.notifPresidencyTransferred => Icons.workspace_premium_outlined,
+  AppConstants.notifMeetingScheduled => Icons.groups_outlined,
+  AppConstants.notifMeetingReminder => Icons.alarm_rounded,
+  AppConstants.notifMeetingCancelled => Icons.event_busy_outlined,
+  AppConstants.notifTermStarted => Icons.auto_awesome_rounded,
   _ => Icons.notifications_outlined,
 };
 
@@ -145,6 +151,12 @@ Color _typeColor(String type) => switch (type) {
   AppConstants.notifPollCreated => AppColors.primary,
   AppConstants.notifMembershipApproved => const Color(0xFF10B981),
   AppConstants.notifJoinRequest => const Color(0xFFF59E0B),
+  AppConstants.notifMemberLeft => AppColors.error,
+  AppConstants.notifPresidencyTransferred => const Color(0xFF8B5CF6),
+  AppConstants.notifMeetingScheduled => const Color(0xFF0EA5E9),
+  AppConstants.notifMeetingReminder => const Color(0xFF0EA5E9),
+  AppConstants.notifMeetingCancelled => AppColors.error,
+  AppConstants.notifTermStarted => const Color(0xFF8B5CF6),
   _ => AppColors.textSecondary,
 };
 
@@ -156,6 +168,11 @@ String? _routeForType(String type) => switch (type) {
   AppConstants.notifAnnouncement => '/announcements',
   AppConstants.notifPollCreated => '/polls',
   AppConstants.notifJoinRequest => '/approvals',
+  AppConstants.notifMemberLeft => '/directory',
+  AppConstants.notifPresidencyTransferred => '/directory',
+  AppConstants.notifMeetingScheduled => '/meetings',
+  AppConstants.notifMeetingReminder => '/meetings',
+  AppConstants.notifMeetingCancelled => '/meetings',
   _ => null,
 };
 

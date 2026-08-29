@@ -40,13 +40,6 @@ final taskCommentsProvider =
   return ref.read(tasksRepositoryProvider).getComments(taskId);
 });
 
-// Attachments for a task
-final taskAttachmentsProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, String>(
-        (ref, taskId) async {
-  return ref.read(tasksRepositoryProvider).getAttachments(taskId);
-});
-
 // Approved club members for the assignment picker: presidents assign
 // to VPs; VPs to their OWN directors (reports_to link captured at
 // signup) and to fellow VPs.

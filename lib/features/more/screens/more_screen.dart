@@ -29,6 +29,12 @@ class MoreScreen extends ConsumerWidget {
         color: AppColors.primary,
       ),
       _Destination(
+        icon: Icons.groups_rounded,
+        label: 'Meetings',
+        route: '/meetings',
+        color: const Color(0xFF0EA5E9),
+      ),
+      _Destination(
         icon: Icons.notifications_rounded,
         label: 'Notifications',
         route: '/notifications',

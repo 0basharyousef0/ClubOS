@@ -452,33 +452,39 @@ class _MemberChecklist extends ConsumerWidget {
           style: TextStyle(color: AppColors.error, fontSize: 13)),
       data: (members) => Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.border),
         ),
-        child: Column(
-          children: [
-            for (final m in members)
-              CheckboxListTile(
-                dense: true,
-                controlAffinity: ListTileControlAffinity.leading,
-                activeColor: AppColors.primary,
-                value: selectedIds.contains(m.userId),
-                onChanged: (_) => onToggle(m.userId),
-                title: Text(
-                  m.userId == myUserId
-                      ? '${m.profile?.fullName ?? 'Member'} (You)'
-                      : m.profile?.fullName ?? 'Member',
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w500),
+        clipBehavior: Clip.antiAlias,
+        // Material ancestor so the tiles' ink renders — a bare
+        // DecoratedBox with a colour swallows it and Flutter throws
+        // "ListTile background color or ink splashes may be invisible".
+        child: Material(
+          color: AppColors.surface,
+          child: Column(
+            children: [
+              for (final m in members)
+                CheckboxListTile(
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  activeColor: AppColors.primary,
+                  value: selectedIds.contains(m.userId),
+                  onChanged: (_) => onToggle(m.userId),
+                  title: Text(
+                    m.userId == myUserId
+                        ? '${m.profile?.fullName ?? 'Member'} (You)'
+                        : m.profile?.fullName ?? 'Member',
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: Text(
+                    m.roleDisplayName,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
+                  ),
                 ),
-                subtitle: Text(
-                  m.roleDisplayName,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

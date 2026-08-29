@@ -1,9 +1,7 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/constants.dart';
@@ -24,7 +22,6 @@ class TaskDetailScreen extends ConsumerStatefulWidget {
 class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   final _commentController = TextEditingController();
   bool _isPosting = false;
-  bool _isUploading = false;
   bool _isUpdatingStatus = false;
 
   @override
@@ -213,31 +210,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     }
   }
 
-  Future<void> _uploadAttachment() async {
-    final result = await FilePicker.platform.pickFiles(
-      withData: true,
-      allowMultiple: false,
-    );
-    if (result == null || result.files.isEmpty) return;
-    setState(() => _isUploading = true);
-    try {
-      await ref
-          .read(tasksRepositoryProvider)
-          .uploadAttachment(widget.taskId, result.files.first);
-      ref.invalidate(taskAttachmentsProvider(widget.taskId));
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Upload failed. Check storage bucket setup.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isUploading = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -295,11 +267,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           currentUserId: _currentUserId,
           commentController: _commentController,
           isPosting: _isPosting,
-          isUploading: _isUploading,
           isUpdatingStatus: _isUpdatingStatus,
           onUpdateStatus: _updateStatus,
           onPostComment: _postComment,
-          onUpload: _uploadAttachment,
         ),
       ),
     );
@@ -312,11 +282,9 @@ class _TaskBody extends ConsumerWidget {
   final String currentUserId;
   final TextEditingController commentController;
   final bool isPosting;
-  final bool isUploading;
   final bool isUpdatingStatus;
   final Future<void> Function(String) onUpdateStatus;
   final Future<void> Function() onPostComment;
-  final Future<void> Function() onUpload;
 
   const _TaskBody({
     required this.task,
@@ -324,11 +292,9 @@ class _TaskBody extends ConsumerWidget {
     required this.currentUserId,
     required this.commentController,
     required this.isPosting,
-    required this.isUploading,
     required this.isUpdatingStatus,
     required this.onUpdateStatus,
     required this.onPostComment,
-    required this.onUpload,
   });
 
   bool get _isAssignedToMe => task.assignedTo == currentUserId;
@@ -348,7 +314,6 @@ class _TaskBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final commentsAsync = ref.watch(taskCommentsProvider(taskId));
-    final attachmentsAsync = ref.watch(taskAttachmentsProvider(taskId));
 
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -383,69 +348,6 @@ class _TaskBody extends ConsumerWidget {
             ),
           ),
         ],
-
-        const SizedBox(height: 16),
-
-        // ── Attachments ───────────────────────────────────────
-        _SectionCard(
-          title: 'Attachments',
-          icon: Icons.attach_file_rounded,
-          trailing: isUploading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      color: AppColors.primary, strokeWidth: 2),
-                )
-              : GestureDetector(
-                  onTap: onUpload,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.upload_rounded,
-                            size: 14, color: AppColors.primary),
-                        SizedBox(width: 4),
-                        Text(
-                          'Upload',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-          child: attachmentsAsync.when(
-            loading: () => const SizedBox(
-                height: 24,
-                child: Center(
-                    child: LinearProgressIndicator(
-                        color: AppColors.primary))),
-            error: (_, _) => const Text('Could not load attachments.',
-                style:
-                    TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-            data: (attachments) => attachments.isEmpty
-                ? const Text(
-                    'No attachments yet.',
-                    style: TextStyle(
-                        color: AppColors.textSecondary, fontSize: 13),
-                  )
-                : Column(
-                    children: attachments
-                        .map((a) => _AttachmentRow(attachment: a))
-                        .toList(),
-                  ),
-          ),
-        ),
 
         const SizedBox(height: 16),
 
@@ -783,13 +685,11 @@ class _SectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final Widget child;
-  final Widget? trailing;
 
   const _SectionCard({
     required this.title,
     required this.icon,
     required this.child,
-    this.trailing,
   });
 
   @override
@@ -820,8 +720,6 @@ class _SectionCard extends StatelessWidget {
                   color: AppColors.textPrimary,
                 ),
               ),
-              const Spacer(),
-              ?trailing,
             ],
           ),
           const SizedBox(height: 14),
@@ -922,66 +820,3 @@ class _CommentBubble extends StatelessWidget {
   }
 }
 
-// ── Attachment row ────────────────────────────────────────────
-
-class _AttachmentRow extends StatelessWidget {
-  final Map<String, dynamic> attachment;
-  const _AttachmentRow({required this.attachment});
-
-  IconData _iconForFile(String name) {
-    final ext = name.split('.').last.toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext)) {
-      return Icons.image_outlined;
-    }
-    if (['pdf'].contains(ext)) return Icons.picture_as_pdf_outlined;
-    if (['doc', 'docx'].contains(ext)) return Icons.description_outlined;
-    return Icons.insert_drive_file_outlined;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final name = attachment['file_name'] as String? ?? 'File';
-    final url = attachment['file_url'] as String? ?? '';
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: GestureDetector(
-        onTap: () async {
-          final uri = Uri.tryParse(url);
-          if (uri != null && await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              Icon(_iconForFile(name),
-                  color: AppColors.primary, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const Icon(Icons.open_in_new_rounded,
-                  size: 14, color: AppColors.textSecondary),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
