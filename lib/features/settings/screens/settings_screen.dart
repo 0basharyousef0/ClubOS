@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/widgets/verification_code_view.dart';
 import '../../../core/supabase_client.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../../../features/directory/providers/directory_providers.dart';
@@ -559,6 +560,11 @@ class _ChangeSheetState extends State<_ChangeSheet> {
   final _otpController = TextEditingController();
 
   bool _otpSent = false;
+
+  /// Set once the change has been requested and Supabase has emailed a
+  /// confirmation code to the new address; the sheet then collects that
+  /// second code. Only ever used for [_ChangeType.email].
+  String? _pendingNewEmail;
   bool _isSending = false;
   bool _isConfirming = false;
   bool _obscureNew = true;
@@ -597,8 +603,8 @@ class _ChangeSheetState extends State<_ChangeSheet> {
     if (widget.type == _ChangeType.email && !v.contains('@')) {
       return 'Enter a valid email';
     }
-    if (widget.type == _ChangeType.password && v.length < 6) {
-      return 'Password must be at least 6 characters';
+    if (widget.type == _ChangeType.password && v.length < 8) {
+      return 'Password must be at least 8 characters';
     }
     if (widget.type == _ChangeType.password &&
         _confirmController.text != _newValueController.text) {
@@ -665,6 +671,17 @@ class _ChangeSheetState extends State<_ChangeSheet> {
           await supabase.auth.updateUser(
             UserAttributes(email: newValue),
           );
+          // Supabase now emails a second code, this time to the NEW
+          // address — proving they can receive mail there. Stay in the
+          // sheet to collect it rather than closing on a half-done
+          // change.
+          if (mounted) {
+            setState(() {
+              _pendingNewEmail = newValue;
+              _isConfirming = false;
+            });
+          }
+          return;
         case _ChangeType.password:
           await supabase.auth.updateUser(
             UserAttributes(password: newValue),
@@ -706,6 +723,39 @@ class _ChangeSheetState extends State<_ChangeSheet> {
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).padding.bottom;
+
+    // Final leg of an email change: confirm the code sent to the new
+    // address. Reuses the shared panel the signup and recovery flows use.
+    final pendingNewEmail = _pendingNewEmail;
+    if (pendingNewEmail != null) {
+      return Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: EdgeInsets.fromLTRB(24, 16, 24, bottomPadding + 24),
+        child: SingleChildScrollView(
+          child: VerificationCodeView(
+            email: pendingNewEmail,
+            title: 'Confirm your new email',
+            subtitle: 'We sent a 6-digit code to',
+            verifyLabel: 'Confirm new email',
+            onVerify: (code) async {
+              await supabase.auth.verifyOTP(
+                email: pendingNewEmail,
+                token: code,
+                type: OtpType.emailChange,
+              );
+              widget.onSuccess();
+              if (context.mounted) {
+                Navigator.pop(context);
+                _showSuccess(context);
+              }
+            },
+          ),
+        ),
+      );
+    }
 
     return Container(
       decoration: const BoxDecoration(

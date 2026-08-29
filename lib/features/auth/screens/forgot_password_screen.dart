@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/widgets/verification_code_view.dart';
 import '../providers/auth_providers.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
@@ -56,7 +57,28 @@ class _ForgotPasswordScreenState
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-          child: _sent ? _SuccessView(email: widget.email) : _SendView(
+          child: _sent
+              ? VerificationCodeView(
+                  email: widget.email,
+                  title: 'Enter your code',
+                  subtitle: 'We sent a 6-digit code to',
+                  verifyLabel: 'Verify code',
+                  onVerify: (code) async {
+                    await ref
+                        .read(authRepositoryProvider)
+                        .verifyRecoveryCode(email: widget.email, token: code);
+                    // The session is live now; the router's
+                    // passwordRecovery guard lands us on the new-password
+                    // screen.
+                    if (context.mounted) context.go('/reset-password');
+                  },
+                  onResend: () => ref
+                      .read(authRepositoryProvider)
+                      .sendPasswordResetEmail(widget.email),
+                  onBack: () => context.go('/login'),
+                  backLabel: 'Back to Login',
+                )
+              : _SendView(
             email: widget.email,
             isLoading: _isLoading,
             errorMessage: _errorMessage,
@@ -104,7 +126,7 @@ class _SendView extends StatelessWidget {
             style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 6),
         Text(
-          'We\'ll send a reset link to:',
+          'We\'ll send a 6-digit code to:',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 12),
@@ -147,49 +169,12 @@ class _SendView extends StatelessWidget {
                   child: CircularProgressIndicator(
                       color: Colors.white, strokeWidth: 2),
                 )
-              : const Text('Send Reset Link'),
+              : const Text('Send Reset Code'),
         ),
         const SizedBox(height: 12),
         OutlinedButton(
           onPressed: isLoading ? null : onBack,
           child: const Text('Back'),
-        ),
-      ],
-    );
-  }
-}
-
-class _SuccessView extends StatelessWidget {
-  final String email;
-  const _SuccessView({required this.email});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: AppColors.success.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Icon(Icons.mark_email_read_rounded,
-              color: AppColors.success, size: 28),
-        ),
-        const SizedBox(height: 20),
-        Text('Check your email',
-            style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 6),
-        Text(
-          'A reset link was sent to $email. Tap it to set a new password.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 32),
-        OutlinedButton(
-          onPressed: () => context.go('/login'),
-          child: const Text('Back to Login'),
         ),
       ],
     );

@@ -15,10 +15,55 @@ class AuthRepository {
     return result as bool;
   }
 
+  /// Emails a 6-digit recovery code. No `redirectTo`: every auth email
+  /// template renders `{{ .Token }}` instead of a link, so the app never
+  /// depends on a deep link or a hosted callback page. That also retires
+  /// the `io.clubos://` custom scheme flagged as MED-06 in
+  /// SECURITY_AUDIT.md.
   Future<void> sendPasswordResetEmail(String email) async {
-    await supabase.auth.resetPasswordForEmail(
-      email.trim(),
-      redirectTo: 'io.clubos://reset-password',
+    await supabase.auth.resetPasswordForEmail(email.trim());
+  }
+
+  /// Exchanges a recovery code for a session so the password can be set.
+  Future<void> verifyRecoveryCode({
+    required String email,
+    required String token,
+  }) async {
+    await supabase.auth.verifyOTP(
+      email: email.trim(),
+      token: token.trim(),
+      type: OtpType.recovery,
+    );
+  }
+
+  /// Confirms a new account with the code from the signup email. Returns
+  /// a session, so the caller can continue straight into club selection.
+  Future<void> verifySignupCode({
+    required String email,
+    required String token,
+  }) async {
+    await supabase.auth.verifyOTP(
+      email: email.trim(),
+      token: token.trim(),
+      type: OtpType.signup,
+    );
+  }
+
+  Future<void> resendSignupCode(String email) async {
+    await supabase.auth.resend(type: OtpType.signup, email: email.trim());
+  }
+
+  /// Confirms an email change with the code sent to the NEW address.
+  /// Requires "Secure email change" to be off in Supabase, otherwise the
+  /// old address must be confirmed as well.
+  Future<void> verifyEmailChangeCode({
+    required String newEmail,
+    required String token,
+  }) async {
+    await supabase.auth.verifyOTP(
+      email: newEmail.trim(),
+      token: token.trim(),
+      type: OtpType.emailChange,
     );
   }
 

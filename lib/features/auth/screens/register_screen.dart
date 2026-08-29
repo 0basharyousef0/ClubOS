@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/widgets/verification_code_view.dart';
 import '../../../core/constants.dart';
 import '../providers/auth_providers.dart';
 
@@ -200,7 +201,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           if (v == null || v.isEmpty) {
                             return 'Password is required';
                           }
-                          if (v.length < 6) return 'Minimum 6 characters';
+                          if (v.length < 8) return 'Minimum 8 characters';
                           return null;
                         },
                       ),
@@ -319,46 +320,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Widget _buildConfirmEmailView(BuildContext context) {
+    final email = _confirmEmailSentTo!;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            children: [
-              const Spacer(),
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.mark_email_unread_rounded,
-                  color: AppColors.primary,
-                  size: 52,
-                ),
-              ),
-              const SizedBox(height: 28),
-              Text('Confirm your email',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              Text(
-                'We sent a confirmation link to\n$_confirmEmailSentTo\n\n'
-                'Tap the link in that email, then log in to finish '
-                'setting up your account.',
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 40),
-              ElevatedButton(
-                onPressed: () => context.go('/login'),
-                child: const Text('Go to Log In'),
-              ),
-              const Spacer(),
-            ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+          child: VerificationCodeView(
+            email: email,
+            title: 'Confirm your email',
+            subtitle: 'We sent a 6-digit code to',
+            verifyLabel: 'Confirm account',
+            onVerify: (code) async {
+              await ref
+                  .read(authRepositoryProvider)
+                  .verifySignupCode(email: email, token: code);
+              // Verifying signs them in, so continue straight into the
+              // club step their chosen role needs.
+              if (!context.mounted) return;
+              if (_selectedRole == AppConstants.rolePresident) {
+                context.go('/club-setup');
+              } else {
+                context.go('/club-select');
+              }
+            },
+            onResend: () =>
+                ref.read(authRepositoryProvider).resendSignupCode(email),
+            onBack: () => context.go('/login'),
+            backLabel: 'Back to Log In',
           ),
         ),
       ),
