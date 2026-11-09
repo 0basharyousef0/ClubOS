@@ -5,13 +5,22 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme.dart';
 import '../../core/constants.dart';
 
-/// Opens a URL outside the app. Returns false if it could not be opened,
-/// so callers can surface a fallback rather than appearing to do nothing.
+/// Opens a URL. Web pages open in an in-app browser sheet (Safari View
+/// Controller on iOS) so the user never leaves ClubOS; anything else —
+/// mailto: in particular — is handed to the system. Returns false if it
+/// could not be opened, so callers can surface a fallback rather than
+/// appearing to do nothing.
 Future<bool> openExternalUrl(String url) async {
   final uri = Uri.tryParse(url);
   if (uri == null) return false;
+  final isWeb = uri.scheme == 'https' || uri.scheme == 'http';
   try {
-    return await launchUrl(uri, mode: LaunchMode.externalApplication);
+    return await launchUrl(
+      uri,
+      mode: isWeb
+          ? LaunchMode.inAppBrowserView
+          : LaunchMode.externalApplication,
+    );
   } catch (_) {
     return false;
   }
