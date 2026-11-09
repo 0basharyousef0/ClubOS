@@ -30,7 +30,7 @@ class AppConstants {
   static const String urlSupport = 'https://clubos.com.co/';
 
   /// Shown publicly in-app and on the App Store listing.
-  static const String supportEmail = 'basharkyousef2@gmail.com';
+  static const String supportEmail = 'support@clubos.com.co';
 
   // Roles
   static const String rolePresident = 'president';
