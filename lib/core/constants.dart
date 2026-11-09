@@ -20,12 +20,14 @@ class AppConstants {
 
   // Public legal + support surfaces. Required by App Store review:
   // guideline 5.1.1 (privacy policy) and 1.2 (terms with content rules
-  // and a contact for reporting). Served from /docs via GitHub Pages.
+  // and a contact for reporting). Served from /docs by Cloudflare Pages
+  // on the project's own domain, so the GitHub account and repo never
+  // appear to users. Extensionless paths: Pages 308-redirects `.html`.
   static const String urlPrivacyPolicy =
-      'https://0basharyousef0.github.io/ClubOS/privacy-policy.html';
+      'https://clubos.com.co/privacy-policy';
   static const String urlTermsOfService =
-      'https://0basharyousef0.github.io/ClubOS/terms-of-service.html';
-  static const String urlSupport = 'https://0basharyousef0.github.io/ClubOS/';
+      'https://clubos.com.co/terms-of-service';
+  static const String urlSupport = 'https://clubos.com.co/';
 
   /// Shown publicly in-app and on the App Store listing.
   static const String supportEmail = 'basharkyousef2@gmail.com';
