@@ -9,6 +9,7 @@ import '../../../features/auth/providers/auth_providers.dart';
 import '../../../features/dashboard/providers/dashboard_providers.dart';
 import '../../../shared/models/event_model.dart';
 import '../providers/events_providers.dart';
+import '../../../shared/widgets/success_overlay.dart';
 
 class EventDetailScreen extends ConsumerStatefulWidget {
   final String eventId;
@@ -160,6 +161,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         await repo.cancelRsvp(event.id);
       } else {
         await repo.rsvp(event.id);
+        // Celebrate joining only; cancelling an RSVP stays quiet.
+        if (mounted) {
+          showSuccessOverlay(
+            context,
+            title: "You're going",
+            subtitle: event.title,
+          );
+        }
       }
       ref.invalidate(eventDetailProvider(widget.eventId));
       ref.invalidate(clubEventsProvider);

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/widgets/success_overlay.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../../../shared/models/user_club_role_model.dart';
 import '../providers/tasks_providers.dart';
@@ -57,7 +58,16 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
             urgency: _urgency,
           );
       ref.invalidate(assignedByMeTasksProvider);
-      if (mounted) context.pop();
+      if (mounted) {
+        // Not awaited: the overlay sits on the root overlay, so popping
+        // straight away lets the liquid drain to reveal the task list.
+        showSuccessOverlay(
+          context,
+          title: 'Task assigned',
+          subtitle: 'Sent to ${_assignedTo!.profile?.fullName ?? 'your teammate'}',
+        );
+        context.pop();
+      }
     } catch (e) {
       if (mounted) setState(() => _error = 'Failed to create task. Try again.');
     } finally {

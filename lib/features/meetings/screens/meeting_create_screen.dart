@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/constants.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../providers/meetings_providers.dart';
+import '../../../shared/widgets/success_overlay.dart';
 
 class MeetingCreateScreen extends ConsumerStatefulWidget {
   const MeetingCreateScreen({super.key});
@@ -132,7 +133,18 @@ class _MeetingCreateScreenState extends ConsumerState<MeetingCreateScreen> {
         attendeeUserIds: attendees,
       );
       ref.invalidate(meetingsProvider);
-      if (mounted) context.go('/meetings');
+      if (mounted) {
+        // The scheduler is in the attendee list but isn't sent an invite.
+        final invited = attendees.length - 1;
+        showSuccessOverlay(
+          context,
+          title: 'Meeting scheduled',
+          subtitle: invited == 1
+              ? 'Invite sent to 1 person'
+              : 'Invites sent to $invited people',
+        );
+        context.go('/meetings');
+      }
     } catch (e) {
       setState(() => _errorMessage = e.toString());
     } finally {

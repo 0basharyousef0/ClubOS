@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../providers/announcements_providers.dart';
+import '../../../shared/widgets/success_overlay.dart';
 
 class AnnouncementCreateScreen extends ConsumerStatefulWidget {
   const AnnouncementCreateScreen({super.key});
@@ -55,7 +56,14 @@ class _AnnouncementCreateScreenState
             content: content,
           );
       ref.invalidate(clubAnnouncementsProvider);
-      if (mounted) context.pop();
+      if (mounted) {
+        showSuccessOverlay(
+          context,
+          title: 'Announcement posted',
+          subtitle: 'Your club has been notified',
+        );
+        context.pop();
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _error = 'Failed to post announcement. Try again.');

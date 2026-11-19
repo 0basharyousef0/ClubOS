@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/supabase_client.dart';
 import '../../../shared/models/poll_model.dart';
 import '../providers/polls_providers.dart';
+import '../../../shared/widgets/success_overlay.dart';
 
 class PollDetailScreen extends ConsumerStatefulWidget {
   final String pollId;
@@ -293,6 +294,7 @@ class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
           .vote(widget.pollId, _selectedOptionId!);
       ref.invalidate(pollDetailProvider(widget.pollId));
       ref.invalidate(pollsProvider);
+      if (mounted) showSuccessOverlay(context, title: 'Vote cast');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

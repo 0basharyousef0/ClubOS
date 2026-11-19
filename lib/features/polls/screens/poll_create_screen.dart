@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/constants.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../providers/polls_providers.dart';
+import '../../../shared/widgets/success_overlay.dart';
 
 class PollCreateScreen extends ConsumerStatefulWidget {
   const PollCreateScreen({super.key});
@@ -104,7 +105,16 @@ class _PollCreateScreenState extends ConsumerState<PollCreateScreen> {
             closesAt: _closesAt,
           );
       ref.invalidate(pollsProvider);
-      if (mounted) context.go('/polls');
+      if (mounted) {
+        showSuccessOverlay(
+          context,
+          title: 'Poll sent',
+          subtitle: eligible.length == 1
+              ? '1 member can vote'
+              : '${eligible.length} members can vote',
+        );
+        context.go('/polls');
+      }
     } catch (e) {
       setState(() => _errorMessage = e.toString());
     } finally {

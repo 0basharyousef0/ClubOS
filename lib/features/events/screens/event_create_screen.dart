@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../app/theme.dart';
 import '../../../features/auth/providers/auth_providers.dart';
 import '../providers/events_providers.dart';
+import '../../../shared/widgets/success_overlay.dart';
 
 class EventCreateScreen extends ConsumerStatefulWidget {
   const EventCreateScreen({super.key});
@@ -91,7 +92,14 @@ class _EventCreateScreenState extends ConsumerState<EventCreateScreen> {
             eventDate: eventDateTime,
           );
       ref.invalidate(clubEventsProvider);
-      if (mounted) context.pop();
+      if (mounted) {
+        showSuccessOverlay(
+          context,
+          title: 'Event created',
+          subtitle: 'Your club has been notified',
+        );
+        context.pop();
+      }
     } catch (e) {
       if (mounted) setState(() => _error = 'Failed to create event. Try again.');
     } finally {
